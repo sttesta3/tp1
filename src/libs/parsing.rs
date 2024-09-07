@@ -1,47 +1,9 @@
-use std::io::BufReader;
-use std::fs::File;
-use std::vec;
-use std::{collections::HashMap, error, io::Empty, iter::Enumerate, path::Display};
-
-pub mod query;
-pub mod libs;
-
-use crate::libs::
-use query::build_empty_query;
-use crate::query::Query;
-use crate::query::query_type::QueryType;
-
-fn main() {
-    let args: Vec<String> = std::env::args().collect();
-    if args.len() < 3 {
-        println!("Uso: cargo run -- ruta/a/tablas \"query\"");
-    } else {
-        let path: &String = &args[1]; 
-        let args = text_to_vec(&args[2]);   // Tokenization
-        match build_query(args, path) {
-            Ok(x) => exec_query(x),
-//            Err(x) => print_err(x)
-            Err(_) => println!("TODO print_err")    
-        }
+fn build_query(args: Vec<String>, path: &String) -> Result<Query, u32> {
+    // Full "Compilation" process of query. Tokenization, sintactic analysis, semantic and build 
+    match vec_to_query(&args, path) {
+        Ok(x) => return validate_query(x),   // Sintaxis analysis
+        Err(x) => return Err(x)
     }
-}
-
-fn exec_query(query: query::Query) -> Result<u32,u32> {
-    match query.table {
-        Some(f) => match std::fs::File::open(f) {
-                Ok(x) => {
-                    match query.operation.unwrap() {
-                        QueryType::DELETE => exec_query_delete(x, query),
-                        QueryType::INSERT => exec_query_insert(x, query),
-                        QueryType::SELECT => exec_query_select(x, query),
-                        QueryType::UPDATE => exec_query_update(x, query),
-                    }
-                }, 
-                Err(_) => return Err(6)
-            } ,
-        None => return Err(6)
-    }
-
 }
 
 /* 
@@ -57,14 +19,6 @@ fn build_query(text_query: &String, path: &String) -> Result<Query, u32>{
 
 }
 */
-
-fn build_query(args: Vec<String>, path: &String) -> Result<Query, u32> {
-    // Full "Compilation" process of query. Tokenization, sintactic analysis, semantic and build 
-    match vec_to_query(&args, path) {
-        Ok(x) => return validate_query(x),   // Sintaxis analysis
-        Err(x) => return Err(x)
-    }
-}
 
 fn validate_query(query: Query) -> Result<Query,u32> {
     // Sintatic analysis 
