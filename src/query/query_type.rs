@@ -1,5 +1,4 @@
 use core::fmt;
-
 pub enum QueryType {
     DELETE,
     INSERT,
