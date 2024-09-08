@@ -1,14 +1,14 @@
 pub mod condition_type;
-use std::ops::RemAssign;
-use std::ptr::null;
 
+use crate::query::Query;
+use crate::libs::error;
 use condition_type::BooleanOperator;
 use condition_type::ConditionOperator;
 
 pub struct Condition {
     pub condition:  ConditionOperator,
-    pub v1:       Option<String>,
-    pub v2:       Option<String>,
+    pub column:     Option<String>,
+    pub value:      Option<String>,
 }
 
 pub struct ComplexCondition {
@@ -16,15 +16,14 @@ pub struct ComplexCondition {
     pub operator:       Option<BooleanOperator>,
     pub condition:      Option<BooleanOperator>,
     pub left_cond:      Option<Box<ComplexCondition>>,  // Oldest condition ( first to be found )
-    pub parent:         Option<Box<ComplexCondition>>,  // Newest condition ( last to be found )
     pub right_cond:     Option<Box<ComplexCondition>>   // Newest condition ( last to be found )
 }
 
-pub fn build_condition(v1: String, v2: String, condition: ConditionOperator) -> Condition {
+pub fn build_condition(column: String, value: String, condition: ConditionOperator) -> Condition {
     return Condition {
         condition:  condition,
-        v1:         Some(v1),
-        v2:         Some(v2),
+        column:     Some(column),
+        value:      Some(value),
     }
 }
 
@@ -33,12 +32,21 @@ pub fn build_empty_complex_condition() -> ComplexCondition {
         operator:       None,
         condition:      None,
         left_cond:      None,
-        right_cond:     None,
-        parent:         None,
+        right_cond:     None
     }
 }
 
+pub fn build_complex_condition(operator: BooleanOperator, left: Option<Box<ComplexCondition>>, right: Option<Box<ComplexCondition>>) -> ComplexCondition {
+    return ComplexCondition {
+        operator:       Some(operator),
+        condition:      None,
+        left_cond:      left,
+        right_cond:     right
+    }
+} 
+
 pub fn tree_check(root: ComplexCondition) -> bool {
+    // In Order valid check ( no None leafs )
     match &root.operator {
         Some(op) => {
             match op {
@@ -72,5 +80,96 @@ fn tree_check_not(root: ComplexCondition) -> bool {
             }
         },
         None => return false
+    }
+}
+
+pub fn add_node_to_tree(args: &Vec<String>, start_position: &mut usize, root: ComplexCondition) -> Result<ComplexCondition,u32> {
+    if *start_position == args.len() || args[*start_position].eq("ORDER") {
+        if tree_check(root) {
+            Ok(root)
+        } else {
+            Err(error::WHERE_MAL_FORMATEADO)
+        }
+    } else if args[*start_position].eq("OR") {
+        add_node_to_tree_or(args, &mut start_position, root)
+    } else if args[*start_position].eq("AND") {
+        add_node_to_tree_and(args, &mut start_position, root)
+    } else if args[*start_position].eq("NOT") {
+        add_node_to_tree_not(args, &mut start_position, root)
+    } else if check_valid_args_for_basic_condition(args, *start_position) {
+        match root.operator {
+            Some(op) => {},
+            None => {}
+        }        
+    } else {
+        Err(error::WHERE_MAL_FORMATEADO)
+    }
+}
+
+fn add_node_to_tree_or(args: &Vec<String>, start_position: &mut usize, root: ComplexCondition) -> Result<ComplexCondition,u32> {
+    let new_root = build_complex_condition(BooleanOperator::OR, Some(Box(root)), None );
+    *start_position += 1;
+    add_node_to_tree(args, start_position, new_root)
+}
+
+fn add_node_to_tree_and(args: &Vec<String>, start_position: &mut usize, root: ComplexCondition) -> Result<ComplexCondition,u32> {
+    match root.operator {
+        Some(op) => {
+            match op {
+                BooleanOperator::OR  => {},
+                BooleanOperator::AND => {
+                    let new_root = build_complex_condition(BooleanOperator::AND, Some(Box(root)), None );
+                    *start_position += 1;
+                    add_node_to_tree(args, start_position , new_root)        
+                },
+                BooleanOperator::NOT => {
+                    let new_root = build_complex_condition(BooleanOperator::AND, Some(Box(root)), None );
+                    *start_position += 1;
+                    add_node_to_tree(args, start_position, new_root)        
+                },
+            }
+        },
+        None => {
+            let new_root = build_complex_condition(BooleanOperator::AND, Some(Box(root)), None );
+            add_node_to_tree(args, start_position + 1, new_root)
+        }
+    }
+}
+
+fn add_node_to_tree_not(args: &Vec<String>, start_position: &mut usize, root: ComplexCondition) -> Result<ComplexCondition,u32> {
+
+}
+
+fn check_valid_args_for_basic_condition(args: &Vec<String>, start_position: usize) -> bool {
+    if start_position + 3 > args.len() {
+        false
+    } else {
+        let first = &args[start_position];
+        let second = &args[start_position + 1];
+        let third = &args[start_position + 2];
+
+        if first.eq("AND") || first.eq("OR") || first.eq("NOT") {
+            false
+        } else if second.eq("AND") || second.eq("OR") || second.eq("NOT") {
+            false 
+        } else if ! ( second.eq(">") || second.eq(">=") || second.eq("=") || second.eq("<") || second.eq("<=") ) {
+            false
+        } else if third.eq("AND") || third.eq("OR") || third.eq("NOT") {
+            false
+        } else {
+            true 
+        }
+    }  
+}
+
+fn get_where_columns(query: &Query, vec: Vec<String>, node: &ComplexCondition) -> Vec<String> {
+    match node.operator {
+        Some(_) => {},
+        None => {
+            match node.condition {
+                Some(_) => {},
+                None => return vec
+            }
+        }
     }
 }

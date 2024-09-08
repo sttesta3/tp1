@@ -1,11 +1,14 @@
 use std::io::{BufRead, BufReader};
 use std::fs::File;
 
-use crate::condition::{build_condition, build_empty_complex_condition, tree_check, ComplexCondition, Condition};
+use crate::condition::condition_type::BooleanOperator;
+use crate::condition::{add_node_to_tree, build_complex_condition, build_condition, build_empty_complex_condition, tree_check, ComplexCondition, Condition};
 use crate::libs::error;
-use crate::query::Query;
+use crate::query::{Query, DELETE_MIN_LEN, INSERT_MIN_LEN, SELECT_MIN_LEN, UPDATE_MIN_LEN};
 use crate::query::query_type::QueryType;
 use crate::query::build_empty_query;
+
+use super::error::DELETE_MAL_FORMATEADO;
 
 pub fn build_query(text_query: &String, path: &String) -> Result<Query, u32> {
     // Full "Compilation" process of query. Tokenization, sintactic analysis, semantic and build 
@@ -26,124 +29,117 @@ fn merge_table_and_path(path: &String, table: &String) -> String {
 }
 
 fn separate_args_delete(args: &Vec<String>, path: &String, result: &mut Query) -> Result<u32,u32> {  
-    result.table = Some(merge_table_and_path(path, &args[2]));   
-    match get_where_condition(args, 4, build_empty_complex_condition()) {
-        Ok(cond) => result.where_condition = Some(cond),
-        Err(x) => return Err(x)
-    }
-    Ok(0)
-}
-
-fn get_where_condition(args: &Vec<String>, start_position: usize, root: ComplexCondition) -> Result<ComplexCondition,u32> {
-    if start_position == args.len() || args[start_position].eq("ORDER") {
-        if tree_check(root) {
-            Ok(root)
-        } else {
-            Err(error::WHERE_MAL_FORMATEADO)
-        }
-    } else if args[start_position].eq("OR") {
-        
-    } else if args[start_position].eq("AND") {
-
-    } else if args[start_position].eq("NOT") {
-
-    } else if check_valid_args_for_basic_condition(args, start_position) {
-        
+    if args.len() < DELETE_MIN_LEN {
+        return Err(error::DELETE_MAL_FORMATEADO);
     } else {
-        Err(error::WHERE_MAL_FORMATEADO)
-    }
-}
-
-fn check_valid_args_for_basic_condition(args: &Vec<String>, start_position: usize) -> bool {
-    if start_position + 3 > args.len() {
-        false
-    } else {
-        let first = &args[start_position];
-        let second = &args[start_position + 1];
-        let third = &args[start_position + 2];
-
-        if first.eq("AND") || first.eq("OR") || first.eq("NOT") {
-            false
-        } else if second.eq("AND") || second.eq("OR") || second.eq("NOT") {
-            false 
-        } else if ! ( second.eq(">") || second.eq(">=") || second.eq("=") || second.eq("<") || second.eq("<=") ) {
-            false
-        } else if third.eq("AND") || third.eq("OR") || third.eq("NOT") {
-            false
-        } else {
-            true 
+        result.table = Some(merge_table_and_path(path, &args[2]));   
+        match add_node_to_tree(args, &mut 4, build_empty_complex_condition()) {
+            Ok(cond) => result.where_condition = Some(cond),
+            Err(x) => return Err(x)
         }
-    }  
+        Ok(0)    
+    }
 }
 
-fn separate_args_insert(args: &Vec<String>, path: &String, result: &mut Query) {
-    result.table = Some(merge_table_and_path(path, &args[2]));   
+fn separate_args_insert(args: &Vec<String>, path: &String, result: &mut Query) -> Result<u32,u32> {
+    if args.len() < INSERT_MIN_LEN {
+        return Err(error::INSERT_MAL_FORMATEADO)
+    } else {
+        result.table = Some(merge_table_and_path(path, &args[2]));   
 
-    let mut columns: Vec<String> = Vec::new();
-    let mut counter = 3; 
-    while counter < args.len()/2 && ! args[counter].eq("VALUES") {
-        columns.push(args[counter].to_string());
-        counter += 1;
-    }
-
-    counter += 1;
-    let mut values: Vec<String> = Vec::new();
-    while counter < args.len() {
-        values.push(args[counter].to_string());
-        counter += 1;
-    }
-
-    result.columns = Some(columns);
-    result.values = Some(values);
-}
-
-fn separate_args_update(args: &Vec<String>, path: &String, result: &mut Query) {
-    result.table = Some(merge_table_and_path(path, &args[1]));   
-
-    let mut counter = 3; 
-    let mut columns: Vec<String> = Vec::new();
-    let mut values: Vec<String> = Vec::new();
-
-    while counter < args.len() && !args[counter].eq("WHERE") {
-        if counter % 3 == 0 {
+        let mut columns: Vec<String> = Vec::new();
+        let mut counter = 3; 
+        while counter < args.len()/2 && ! args[counter].eq("VALUES") {
             columns.push(args[counter].to_string());
-        } else if ( counter % 3 ) == 2 {
+            counter += 1;
+        }
+    
+        counter += 1;
+        let mut values: Vec<String> = Vec::new();
+        while counter < args.len() {
             values.push(args[counter].to_string());
-        } 
-        counter += 1;
+            counter += 1;
+        }
+    
+        result.columns = Some(columns);
+        result.values = Some(values);
+        Ok(0)    
     }
-    counter += 1;
-
-    let mut where_condition = Vec::new();
-    while counter < args.len() {
-        where_condition.push(args[counter].to_string());
-        counter += 1;
-    }
-
-    result.columns = Some(columns);
-    result.where_condition = Some(where_condition);
-    result.values = Some(values);
 }
 
-fn separate_args_select(args: &Vec<String>, path: &String, result: &mut Query) { 
-    let mut columns: Vec<String> = Vec::new();
-    let mut counter = 1; 
-    while counter < args.len() && !args[counter].eq("FROM") {
-        columns.push(args[counter].to_string());
-        counter += 1;
-    }
-    counter += 1;
-    result.table = Some(merge_table_and_path(path, &args[counter]));
-    
-    let mut where_condition = Vec::new();
-    while counter < args.len() && !args[counter].eq("ORDER") {
-        where_condition.push(args[counter].to_string());
-        counter += 1;
-    }
-    result.where_condition = Some(where_condition);
+fn separate_args_update(args: &Vec<String>, path: &String, result: &mut Query) -> Result<u32,u32> {
+    if args.len() < UPDATE_MIN_LEN {
+        result.table = Some(merge_table_and_path(path, &args[1]));   
 
-    // Last condition returns false on desc, true on asc 
-    result.order_by = Some((args[counter + 2].to_string(),counter + 3 != args.len()));
+        let mut counter = 3; 
+        let mut columns: Vec<String> = Vec::new();
+        let mut values: Vec<String> = Vec::new();
+    
+        while counter < args.len() && !args[counter].eq("WHERE") {
+            if counter % 3 == 0 {
+                columns.push(args[counter].to_string());
+            } else if ( counter % 3 ) == 2 {
+                values.push(args[counter].to_string());
+            } 
+            counter += 1;
+        }
+        counter += 1;
+    
+        result.columns = Some(columns);
+        result.values = Some(values);
+    
+        match add_node_to_tree(args, &mut counter, build_empty_complex_condition()) {
+            Ok(cond) => result.where_condition = Some(cond),
+            Err(x) => return Err(x)
+        }
+        Ok(0)    
+    } else {
+        return Err(error::UPDATE_MAL_FORMATEADO)
+    }
+}
+
+fn separate_args_select(args: &Vec<String>, path: &String, result: &mut Query) -> Result<u32,u32> { 
+    if args.len() < SELECT_MIN_LEN {
+        return Err(error::SELECT_MAL_FORMATEADO)
+    } else {
+        let mut columns: Vec<String> = Vec::new();
+        let mut counter = 1; 
+        while counter < args.len() && !args[counter].eq("FROM") {
+            columns.push(args[counter].to_string());
+            counter += 1;
+        }
+        counter += 1;
+        result.table = Some(merge_table_and_path(path, &args[counter]));
+        counter += 1;
+        
+        if counter == args.len() {
+            Ok(0)
+        } else {
+            match add_node_to_tree(args, &mut  counter, build_empty_complex_condition()) {
+                Ok(cond) => result.where_condition = Some(cond),
+                Err(x) => return Err(x)
+            }
+        
+            if counter < args.len() {  
+                if args[counter + 1].eq("BY") {
+                    if counter + 3 == args.len() {                                          // ORDER BY column
+                        result.order_by = Some((args[counter + 2].to_string(), true));
+                    } else if counter + 4 == args.len() {                                   // ORDER BY column ASC/DESC
+                        if args[counter + 3].eq("ASC") || args[counter + 3].eq("DESC") {
+                            result.order_by = Some((args[counter + 2].to_string(), args[counter + 2].eq("ASC")));
+                        } else {
+                            return Err(error::ORDER_BY_MAL_FORMATEADO)
+                        }
+                    } else {
+                        return Err(error::ORDER_BY_MAL_FORMATEADO)
+                    }
+                } else {
+                    return Err(error::ORDER_BY_MAL_FORMATEADO)
+                }
+            }
+            Ok(0)        
+        }
+    }
 }
 
 fn check_operation_format(args: &Vec<String>) -> Result<QueryType, u32> {
@@ -300,7 +296,7 @@ fn validate_query(query: Query) -> Result<Query,u32> {
 
     match &query.operation {
         Some(op) => {
-            match &query.operation.unwrap() {
+            match op {
                 QueryType::DELETE => validate_delete_query(query),
                 QueryType::INSERT => validate_insert_query(query),
                 QueryType::SELECT => validate_select_query(query),
@@ -312,7 +308,7 @@ fn validate_query(query: Query) -> Result<Query,u32> {
 }
 
 fn validate_delete_query(query: Query) -> Result<Query,u32> {
-    if query.columns.is_none() && query.values.is_none() && query.columns.is_none() {
+    if query.columns.is_none() && query.values.is_none() && query.where_condition.is_some() {
         match &query.table {
             Some(table) => {
                 match File::open(table) {
@@ -330,6 +326,21 @@ fn validate_delete_query(query: Query) -> Result<Query,u32> {
     } else {
         Err(error::DELETE_MAL_FORMATEADO)
     }
+}
+
+fn validate_insert_query(query: Query) -> Result<Query,u32> {
+    // TODO
+    Ok(query)
+}
+
+fn validate_select_query(query: Query) -> Result<Query,u32> {
+    // TODO 
+    Ok(query)
+}
+
+fn validate_update_query(query: Query) -> Result<Query,u32> {
+    // TODO 
+    Ok(query)
 }
 
 fn get_columns(file: File) -> Option<Vec<String>> {
@@ -354,23 +365,19 @@ fn get_columns(file: File) -> Option<Vec<String>> {
     }
 }
 
-fn get_where_columns(query: &Query) -> Option<Vec<String>> {
-
-}
-
 fn check_columns_contains_condition(columns: Vec<String>, query: Query) -> Result<Query,u32> {
-
+    // TODO 
 } 
 
 fn text_to_vec(text_query: &String) -> Vec<String> {
     // Text to vector. Tokenization by space, new line & coma
     let tmp_text_query = text_query;
     tmp_text_query.replace('\n', " ");
-    tmp_text_query.replace(',', " ");
+    tmp_text_query.replace(',', "");
     tmp_text_query.replace(';', "");
-    let mut result: Vec<String> = Vec::new();
     let mut split = tmp_text_query.split(' ');
 
+    let mut result: Vec<String> = Vec::new();
     let mut element_opt = split.next();
     while element_opt.is_some() {
         match element_opt {
@@ -392,14 +399,22 @@ fn vec_to_query(args: &Vec<String>, path: &String) -> Result<Query,u32>{
         Ok(x) => {
             match &x {
                 QueryType::DELETE => match separate_args_delete(args, path, &mut result){
-                    Ok(_) => ,
+                    Ok(_) => result.operation = Some(x),
                     Err(x) => return Err(x)
                 }, 
-                QueryType::INSERT => separate_args_insert(args, path, &mut result),
-                QueryType::SELECT => separate_args_select(args, path, &mut result),
-                QueryType::UPDATE => separate_args_update(args, path, &mut result)
+                QueryType::INSERT => match separate_args_insert(args, path, &mut result) {
+                    Ok(_) => result.operation = Some(x),
+                    Err(x) => return Err(x)
+                },
+                QueryType::SELECT => match separate_args_select(args, path, &mut result) {
+                    Ok(_) => result.operation = Some(x),
+                    Err(x) => return Err(x)
+                },
+                QueryType::UPDATE => match separate_args_update(args, path, &mut result) {
+                    Ok(_) => result.operation = Some(x),
+                    Err(x) => return Err(x)
+                }
             }
-            result.operation = Some(x);        
         },
         Err(x) => return Err(x)
     } 
