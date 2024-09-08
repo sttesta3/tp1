@@ -1,14 +1,12 @@
 use std::io::{BufRead, BufReader};
 use std::fs::File;
 
-use crate::condition::condition_type::BooleanOperator;
-use crate::condition::{add_node_to_tree, build_complex_condition, build_condition, build_empty_complex_condition, get_where_columns, tree_check, ComplexCondition, Condition};
+//use crate::condition::{add_node_to_tree, build_complex_condition, build_condition, build_empty_complex_condition, get_where_columns, tree_check, ComplexCondition, Condition};
+// use crate::condition::Condition;
 use crate::libs::error;
 use crate::query::{Query, DELETE_MIN_LEN, INSERT_MIN_LEN, SELECT_MIN_LEN, UPDATE_MIN_LEN};
 use crate::query::query_type::QueryType;
 use crate::query::build_empty_query;
-
-use super::error::DELETE_MAL_FORMATEADO;
 
 pub fn build_query(text_query: &String, path: &String) -> Result<Query, u32> {
     // Full "Compilation" process of query. Tokenization, sintactic analysis, semantic and build 
@@ -32,11 +30,14 @@ fn separate_args_delete(args: &Vec<String>, path: &String, result: &mut Query) -
     if args.len() < DELETE_MIN_LEN {
         return Err(error::DELETE_MAL_FORMATEADO);
     } else {
-        result.table = Some(merge_table_and_path(path, &args[2]));   
+        result.table = Some(merge_table_and_path(path, &args[2]));
+
+        /* TODO: Code for complex conditions
         match add_node_to_tree(args, &mut 4, build_empty_complex_condition()) {
             Ok(cond) => result.where_condition = Some(cond),
             Err(x) => return Err(x)
         }
+        */
         Ok(0)    
     }
 }
@@ -87,11 +88,13 @@ fn separate_args_update(args: &Vec<String>, path: &String, result: &mut Query) -
     
         result.columns = Some(columns);
         result.values = Some(values);
-    
+
+        /* TODO: Code for complex conditions    
         match add_node_to_tree(args, &mut counter, build_empty_complex_condition()) {
             Ok(cond) => result.where_condition = Some(cond),
             Err(x) => return Err(x)
         }
+        */
         Ok(0)    
     } else {
         return Err(error::UPDATE_MAL_FORMATEADO)
@@ -115,11 +118,13 @@ fn separate_args_select(args: &Vec<String>, path: &String, result: &mut Query) -
         if counter == args.len() {
             Ok(0)
         } else {
+            /* TODO: Code for complex conditions
             match add_node_to_tree(args, &mut  counter, build_empty_complex_condition()) {
                 Ok(cond) => result.where_condition = Some(cond),
                 Err(x) => return Err(x)
             }
-        
+            */
+
             if counter < args.len() {  
                 if args[counter + 1].eq("BY") {
                     if counter + 3 == args.len() {                                          // ORDER BY column
@@ -370,23 +375,29 @@ fn get_columns(file: File) -> Option<Vec<String>> {
 
 fn check_columns_contains_condition(columns: Vec<String>, query: Query) -> Result<Query,u32> {
     // TODO 
-    match &query.where_condition {
-        Some(node) => {
-            let where_columnns = get_where_columns(&query, Vec::new(), node ); 
-            let mut counter = 0;
-            while counter < columns.len() && where_columnns.contains(&columns[counter]) {
-                counter += 1;
-            }           
-
-            if counter == columns.len() {
-                Ok(query)
+    match get_where_columns(&query) {
+        Some(column) => {
+            if columns.contains(&column) {
+                Ok(query)                        
             } else {
-                Err(error::NO_WHERE)
+                Err(error::ARCHIVO_NO_CONTIENE_COLUMNAS_SOLICITADAS)
             }
         }, 
         None => return Err(error::NO_WHERE)
     }
 } 
+
+fn get_where_columns(query: &Query) -> Option<String> {
+    match &query.where_condition {
+        Some(cond) => {
+            match &cond.column {
+                Some(col) => return Some(col.to_string()),
+                None => return None
+            }
+        },
+        None => return None
+    }
+}
 
 fn text_to_vec(text_query: &String) -> Vec<String> {
     // Text to vector. Tokenization by space, new line & coma

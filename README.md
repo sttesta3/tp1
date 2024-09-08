@@ -6,3 +6,4 @@
 
 Para la lógica compuesta del WHERE el objetivo era crear un arbol de condiciones formado por las relaciones de precedencia. 
 
+Dicho objetivo no pudo ser implementado. Se implementó lógica de condiciones simples ( no compuestas ) 
