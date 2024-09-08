@@ -2,7 +2,7 @@ use std::io::{BufRead, BufReader};
 use std::fs::File;
 
 use crate::condition::condition_type::BooleanOperator;
-use crate::condition::{add_node_to_tree, build_complex_condition, build_condition, build_empty_complex_condition, tree_check, ComplexCondition, Condition};
+use crate::condition::{add_node_to_tree, build_complex_condition, build_condition, build_empty_complex_condition, get_where_columns, tree_check, ComplexCondition, Condition};
 use crate::libs::error;
 use crate::query::{Query, DELETE_MIN_LEN, INSERT_MIN_LEN, SELECT_MIN_LEN, UPDATE_MIN_LEN};
 use crate::query::query_type::QueryType;
@@ -289,9 +289,12 @@ fn check_table_exist(path: &String, args: &Vec<String>, operation: &QueryType) -
 fn validate_query(query: Query) -> Result<Query,u32> {
     // Pre: Sintactical query OK 
     // Post: Valid query for execution
-    match File::open(&query.table.unwrap()) { 
-        Ok(_) => {},  
-        Err(_) => return Err(error::ARCHIVO_NO_PUDO_SER_ABIERTO)    
+    match &query.table {
+        Some(table) => match File::open(table) {
+            Ok(_) => {},
+            Err(_) => return Err(error::ARCHIVO_NO_PUDO_SER_ABIERTO) 
+        },
+        None => return Err(error::ARCHIVO_NO_PUDO_SER_ABIERTO)    
     }
 
     match &query.operation {
@@ -367,6 +370,22 @@ fn get_columns(file: File) -> Option<Vec<String>> {
 
 fn check_columns_contains_condition(columns: Vec<String>, query: Query) -> Result<Query,u32> {
     // TODO 
+    match &query.where_condition {
+        Some(node) => {
+            let where_columnns = get_where_columns(&query, Vec::new(), node ); 
+            let mut counter = 0;
+            while counter < columns.len() && where_columnns.contains(&columns[counter]) {
+                counter += 1;
+            }           
+
+            if counter == columns.len() {
+                Ok(query)
+            } else {
+                Err(error::NO_WHERE)
+            }
+        }, 
+        None => return Err(error::NO_WHERE)
+    }
 } 
 
 fn text_to_vec(text_query: &String) -> Vec<String> {

@@ -162,7 +162,7 @@ fn check_valid_args_for_basic_condition(args: &Vec<String>, start_position: usiz
     }  
 }
 
-fn get_where_columns(query: &Query, vec: Vec<String>, node: &ComplexCondition) -> Vec<String> {
+pub fn get_where_columns(query: &Query, vec: Vec<String>, node: &ComplexCondition) -> Vec<String> {
     match node.operator {
         Some(_) => {},
         None => {
