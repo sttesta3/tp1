@@ -13,4 +13,5 @@ pub static NO_WHERE: u32 = 12;
 
 pub fn print_err(error_code: u32) {
     // TODO print error    
+    println!("ERROR. Codigo: {}",error_code)
 }

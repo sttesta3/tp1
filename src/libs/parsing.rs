@@ -1,12 +1,16 @@
 use std::io::{BufRead, BufReader};
 use std::fs::File;
 
+use crate::condition::condition_type::ConditionOperator;
+use crate::condition::{build_condition, Condition};
 //use crate::condition::{add_node_to_tree, build_complex_condition, build_condition, build_empty_complex_condition, get_where_columns, tree_check, ComplexCondition, Condition};
 // use crate::condition::Condition;
 use crate::libs::error;
 use crate::query::{Query, DELETE_MIN_LEN, INSERT_MIN_LEN, SELECT_MIN_LEN, UPDATE_MIN_LEN};
 use crate::query::query_type::QueryType;
 use crate::query::build_empty_query;
+
+use super::error::SELECT_MAL_FORMATEADO;
 
 pub fn build_query(text_query: &String, path: &String) -> Result<Query, u32> {
     // Full "Compilation" process of query. Tokenization, sintactic analysis, semantic and build 
@@ -32,12 +36,30 @@ fn separate_args_delete(args: &Vec<String>, path: &String, result: &mut Query) -
     } else {
         result.table = Some(merge_table_and_path(path, &args[2]));
 
-        /* TODO: Code for complex conditions
-        match add_node_to_tree(args, &mut 4, build_empty_complex_condition()) {
-            Ok(cond) => result.where_condition = Some(cond),
-            Err(x) => return Err(x)
+        if args.len() != DELETE_MIN_LEN {
+            return Err(error::DELETE_MAL_FORMATEADO)
+        } else {
+            /* TODO: Code for complex conditions
+            match add_node_to_tree(args, &mut 4, build_empty_complex_condition()) {
+                Ok(cond) => result.where_condition = Some(cond),
+                Err(x) => return Err(x)
+            }
+            */
+
+            if args[5].eq("<") {
+                result.where_condition = Some(build_condition(args[4].to_string(), args[6].to_string(), ConditionOperator::Minor))            
+            } else if args[5].eq("<=") {
+                result.where_condition = Some(build_condition(args[4].to_string(), args[6].to_string(), ConditionOperator::MinorEqual))            
+            } else if args[5].eq("=") {
+                result.where_condition = Some(build_condition(args[4].to_string(), args[6].to_string(), ConditionOperator::Equal))            
+            } else if args[5].eq(">=") {
+                result.where_condition = Some(build_condition(args[4].to_string(), args[6].to_string(), ConditionOperator::HigherEqual))            
+            } else if args[5].eq(">") {
+                result.where_condition = Some(build_condition(args[4].to_string(), args[6].to_string(), ConditionOperator::Higher))            
+            } else {
+                return Err(error::WHERE_MAL_FORMATEADO)
+            }
         }
-        */
         Ok(0)    
     }
 }
@@ -124,9 +146,27 @@ fn separate_args_select(args: &Vec<String>, path: &String, result: &mut Query) -
                 Err(x) => return Err(x)
             }
             */
+            if counter + 3 > args.len(){
+                return Err(SELECT_MAL_FORMATEADO);
+            } else if args[counter].eq("WHERE") {
+                counter += 1;
+                if args[counter + 1].eq("<") {
+                    result.where_condition = Some(build_condition(args[counter].to_string(), args[counter + 2].to_string(), ConditionOperator::Minor))            
+                } else if args[counter + 1].eq("<=") {
+                    result.where_condition = Some(build_condition(args[counter].to_string(), args[counter + 2].to_string(), ConditionOperator::MinorEqual))            
+                } else if args[counter + 1].eq("=") {
+                    result.where_condition = Some(build_condition(args[counter].to_string(), args[counter + 2].to_string(), ConditionOperator::Equal))            
+                } else if args[counter + 1].eq(">=") {
+                    result.where_condition = Some(build_condition(args[counter].to_string(), args[counter + 2].to_string(), ConditionOperator::HigherEqual))            
+                } else if args[counter + 1].eq(">") {
+                    result.where_condition = Some(build_condition(args[counter].to_string(), args[counter + 2].to_string(), ConditionOperator::Higher))            
+                } else {
+                    return Err(error::WHERE_MAL_FORMATEADO)
+                }
+            }
 
             if counter < args.len() {  
-                if args[counter + 1].eq("BY") {
+                if args[counter].eq("ORDER") && args[counter + 1].eq("BY") {
                     if counter + 3 == args.len() {                                          // ORDER BY column
                         result.order_by = Some((args[counter + 2].to_string(), true));
                     } else if counter + 4 == args.len() {                                   // ORDER BY column ASC/DESC
@@ -401,10 +441,10 @@ fn get_where_columns(query: &Query) -> Option<String> {
 
 fn text_to_vec(text_query: &String) -> Vec<String> {
     // Text to vector. Tokenization by space, new line & coma
-    let tmp_text_query = text_query;
-    tmp_text_query.replace('\n', " ");
-    tmp_text_query.replace(',', "");
-    tmp_text_query.replace(';', "");
+    let mut tmp_text_query = text_query.to_string();        
+    tmp_text_query = tmp_text_query.replace("\n", " ");
+    tmp_text_query = tmp_text_query.replace(",", "");
+    tmp_text_query = tmp_text_query.replace(";", "");
     let mut split = tmp_text_query.split(' ');
 
     let mut result: Vec<String> = Vec::new();
@@ -452,91 +492,40 @@ fn vec_to_query(args: &Vec<String>, path: &String) -> Result<Query,u32>{
     Ok(result)
 }
 
-/* 
-fn build_query(text_query: &String, path: &String) -> Result<Query, u32>{
-    // Crea query valida o devuelve codigo de error.
-    let args = text_to_vec(text_query);
-    let mut resultado = build_empty_query();
+pub fn get_file_first_line(query: &Query) -> Option<String> {
+    match &query.table {
+        Some(table) => match File::open(table) {
+            Ok(f) => {
+                let mut reader: BufReader<File> = BufReader::new(f);
+                let mut line = String::new();
 
-    match full_check_query(&args, &path, &mut resultado) {
-        Ok(_) => return Ok(resultado), 
-        Err(x) => return Err(x)
-    }
-
-}
-
-fn check_columns_exist(args: &Vec<String>, result: &mut Query) -> Result<Vec<String>,u32> {
-    // TODO columns exist 
-    let file = File::open(&result.table.unwrap() );
-    match file {
-        Ok(_) => {
-            let mut reader = BufReader::new(file);
-
-            let mut line = String::new();
-            match reader.read_line(&mut line) {
-                
-            }
-        }
-        Err(_) => return Err(5)
-    }
-
-}
-
-fn text_to_vec(text_query: &String) -> Vec<String> {
-    let mut resultado: Vec<String> = Vec::new();
-    let mut split = text_query.split(' ');
-
-    let mut element_opt = split.next();
-    while element_opt.is_some() {
-        match element_opt {
-            Some(x) => {
-
-                if x.contains('\n') {
-                    let mut split2 = x.split('\n');
-                    let mut element_split2 = split2.next();
-                    resultado.push(element_split2.unwrap().to_string());
-                    element_split2 = split2.next();
-                    resultado.push(element_split2.unwrap().to_string());
-                } else if x.contains(',') {
-
-                } else {
-                    resultado.push(x.to_string())
+                match reader.read_line(&mut line) {
+                    Ok(_) => Some(line),
+                    Err(_) => None
                 }
-            },    // TODO: Check si esto esta bien 
-            None => continue
-        }
-       element_opt = split.next();
-    }
-
-    resultado
-}
-
-fn full_check_query(args: &Vec<String>, path: &String) -> Result<Query, u32> {
-    let mut error_code :u32 = 0;
-    let mut result = build_empty_query();
-    match check_operation(&args) {
-        Ok(x) => result.operation = Some(x),
-        Err(x) => return Err(x)
-    } 
-    match check_table_exist(path, args, &result.operation.unwrap()){
-        Ok(x) => result.table = Some(x),
-        Err(x) => return Err(x)
-    } 
-    match check_columns_exist(args,&result.table.unwrap()) {
-
+            },
+            Err(_) => None
+        },
+        None => None
     }
 }
-*/
+
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test] 
-    fn test_text_to_vec(){
+    fn test_text_to_vec1(){
         let rt1 = text_to_vec(&String::from("SELECT * FROM table"));
         assert_eq!(rt1, vec!["SELECT","*","FROM","table"]);
-        let rt2 = text_to_vec(&String::from("SELECT id, producto, id_cliente\nFROM ordenes\nWHERE cantidad > 1"));
-        assert_eq!(rt2, vec!["SELECT","id","producto","id_cliente","FROM","ordenes","WHERE","cantidad>1"]);
     }
+
+    #[test] 
+    fn test_text_to_vec2(){
+        let rt2 = text_to_vec(&String::from("SELECT id, producto, id_cliente\nFROM ordenes\nWHERE cantidad > 1"));
+        assert_eq!(rt2, vec!["SELECT","id","producto","id_cliente","FROM","ordenes","WHERE","cantidad",">","1"]);
+    }
+
+
 }

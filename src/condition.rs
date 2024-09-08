@@ -1,8 +1,8 @@
 pub mod condition_type;
+use crate::query::Query;
 /* 
 pub mod complex_condition;
 
-use crate::query::Query;
 use crate::libs::error;
 use condition_type::BooleanOperator;
 */
@@ -22,3 +22,16 @@ pub fn build_condition(column: String, value: String, condition: ConditionOperat
         value:      Some(value),
     }
 }
+
+/* 
+pub fn operate_condition(filter: (&u32,&ConditionOperator,&String), elements: &Vec<String>) -> bool {
+    let (column, operator, value) = filter;
+    match operator {
+        ConditionOperator::Minor => {},
+        ConditionOperator::MinorEqual => {},
+        ConditionOperator::Equal => {},
+        ConditionOperator::Higher => {},
+        ConditionOperator::HigherEqual => {},
+    }
+}
+*/
