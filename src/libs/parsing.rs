@@ -1,16 +1,18 @@
 use std::io::{BufRead, BufReader};
 use std::fs::File;
 
+use crate::condition::{build_condition, ComplexCondition, Condition};
 use crate::libs::error;
 use crate::query::Query;
 use crate::query::query_type::QueryType;
 use crate::query::build_empty_query;
 
+
 pub fn build_query(text_query: &String, path: &String) -> Result<Query, u32> {
     // Full "Compilation" process of query. Tokenization, sintactic analysis, semantic and build 
     let args = text_to_vec(&text_query);  
-    match vec_to_query(&args, path) {               // sintactic analysis
-        Ok(x) => return validate_query(x),   // Semantic analysis
+    match vec_to_query(&args, path) {               
+        Ok(x) => return validate_query(x),  
         Err(x) => return Err(x)
     }
 }
@@ -27,13 +29,18 @@ fn merge_table_and_path(path: &String, table: &String) -> String {
 fn separate_args_delete(args: &Vec<String>, path: &String, result: &mut Query) {  
     result.table = Some(merge_table_and_path(path, &args[2]));   
 
-    let mut where_condition: Vec<String> = Vec::new();
-    where_condition.push(args[4].to_string());
-
+    let mut where_condition: ComplexCondition;
+    let mut simple_condition_tmp: Condition;
+    let mut complex_condition_tmp: Condition;
     let mut counter = 5; 
+
     while counter < args.len() {
-        where_condition.push(args[counter].to_string());
-        counter += 1;
+        if args[counter].eq("AND") || args[counter].eq["OR"] || args[counter].eq("NOT") {
+            complex_condition_tmp = build_condition(v1, v2, condition)
+        }
+        simple_condition = build_condition(args[counter].to_string(), args[counter + 1].to_string(), condition);
+
+        counter += 3;
     }
 
     result.where_condition = Some(where_condition);
@@ -126,11 +133,28 @@ fn check_operation_format(args: &Vec<String>) -> Result<QueryType, u32> {
 }
 
 fn check_delete_format(args: &Vec<String>) -> Result<QueryType, u32> {
-    if args[1].eq("FROM") && args[3].eq("WHERE"){
-        Ok(QueryType::DELETE)            
+    if args[1].eq("FROM") && args[3].eq("WHERE") {
+        non_valid_keywords = vec!["INSERT","INTO",""]
+        Ok(QueryType::DELETE)      
     } else {
         Err(error::DELETE_MAL_FORMATEADO)          
     }
+}
+
+fn check_non_valid_keywords(args: &Vec<String>, non_valid_keywords:  Vec<&str>) -> bool {
+    // Checks if args contains any non valid keyword
+    let mut result = true;
+    let mut counter = 0;
+
+    while counter < args.len() && result {
+        if non_valid_keywords.contains(&&args[counter].as_str()) {
+            result = false;
+        } else {
+            counter += 1;
+        }
+    }
+
+    result
 }
 
 fn check_insert_format(args: &Vec<String>) -> Result<QueryType, u32> {
@@ -166,6 +190,41 @@ fn check_update_format(args: &Vec<String>) -> Result<QueryType, u32> {
     Ok(QueryType::UPDATE)
 }
 
+fn check_where_format(args: &Vec<String>, start_position: usize) -> bool {
+    let mut result = true;
+
+    let mut counter: usize   = start_position;
+
+    let mut not_detected: bool = false;
+    let mut op_detected: bool = false;
+
+    while counter < args.len() && result {
+        if args[counter].eq("NOT") {
+            if not_detected || op_detected {
+                result = false;  // NOT NOT. Que estas haciendo ?
+            } else {
+                not_detected = true;
+                counter += 1;
+            }
+        } else if args[counter].eq("AND") || args[counter].eq("OR")  {
+            if op_detected {
+                result = false;  // AND OR , OR AND, OR OR, AND AND. Que estas haciendo ? 
+            } else {
+                op_detected = true;
+                counter += 1;
+            }
+        } else {
+            if counter + 3 > args.len() {
+                result = false; 
+            } else {
+
+            }
+        }
+    }
+
+    result
+}
+
 fn check_table_exist(path: &String, args: &Vec<String>, operation: &QueryType) -> Result<String, u32>{
     // Asume query bien formateado 
     let mut table= String::from(path);
@@ -199,31 +258,34 @@ fn validate_query(query: Query) -> Result<Query,u32> {
         Err(_) => return Err(error::ARCHIVO_NO_PUDO_SER_ABIERTO)    
     }
 
-    match &query.operation.unwrap() {
-        QueryType::DELETE => validate_delete_query(&query),
-        QueryType::INSERT => validate_insert_query(query),
-        QueryType::SELECT => validate_select_query(query),
-        QueryType::UPDATE => validate_update_query(query),
+    match &query.operation {
+        Some(op) => {
+            match &query.operation.unwrap() {
+                QueryType::DELETE => validate_delete_query(query),
+                QueryType::INSERT => validate_insert_query(query),
+                QueryType::SELECT => validate_select_query(query),
+                QueryType::UPDATE => validate_update_query(query),
+            }
+        },
+        None => return Err(error::OPERACION_INVALIDA)
     }
 }
 
-fn validate_delete_query(query: &Query) -> Result<Query,u32> {
+fn validate_delete_query(query: Query) -> Result<Query,u32> {
     if query.columns.is_none() && query.values.is_none() && query.columns.is_none() {
-        match query.table {
+        match &query.table {
             Some(table) => {
-
+                match File::open(table) {
+                    Ok(file) => {
+                        match get_columns(file) {
+                            Some(columns) => check_columns_contains_condition(columns,query),
+                            None => return Err(error::ARCHIVO_VACIO)
+                        }
+                    },
+                    Err(_) => return Err(error::ARCHIVO_NO_PUDO_SER_ABIERTO)    
+                }
             },
-            Err(_) => Err(error::ARCHIVO_NO_PUDO_SER_ABIERTO)
-        }
-        
-        match File::open(query.table.unwrap()) { 
-            Ok(x) => {
-                match get_columns(x) {
-                    Some(x) => check_columns_contains(x, &query),
-                    None => return Err(error::ARCHIVO_SIN_COLUMNAS)
-                }                
-            },  
-            Err(_) => return Err(error::ARCHIVO_NO_PUDO_SER_ABIERTO)    
+            None => return Err(error::ARCHIVO_NO_PUDO_SER_ABIERTO)
         }
     } else {
         Err(error::DELETE_MAL_FORMATEADO)
@@ -252,10 +314,13 @@ fn get_columns(file: File) -> Option<Vec<String>> {
     }
 }
 
-fn check_columns_contains(columns: Vec<String>, query: &Query) -> Result<Query,u32> {
+fn get_where_columns(query: &Query) -> Option<Vec<String>> {
+
+}
+
+fn check_columns_contains_condition(columns: Vec<String>, query: Query) -> Result<Query,u32> {
 
 } 
-
 
 fn text_to_vec(text_query: &String) -> Vec<String> {
     // Text to vector. Tokenization by space, new line & coma
@@ -266,7 +331,7 @@ fn text_to_vec(text_query: &String) -> Vec<String> {
     while element_opt.is_some() {
         match element_opt {
             Some(x) => {
-                if x.contains(',') {
+                if x.contains(',') || x.contains(";"){
                     let mut tmp = String::from(x);
                     tmp.pop();
                     result.push(tmp);
