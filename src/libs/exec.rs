@@ -116,8 +116,13 @@ fn read_and_print_file(query: &Query, col_filter: i32, columns: &Vec<usize> ) {
                 let mut line = String::new();
 
                 // Print header    
-                reader.read_line(&mut line);                
-                println!("{}",line);
+                match reader.read_line(&mut line) {
+                    Ok(_) => {
+                        print!("{}",line);
+                        line.clear();
+                    },
+                    Err(_) => println!("Error en el programa")  // TODO
+                }                
 
                 // Print other lines
                 let mut read = true;
@@ -131,6 +136,7 @@ fn read_and_print_file(query: &Query, col_filter: i32, columns: &Vec<usize> ) {
                                     Some(condition) => {},
                                     None => print_file_unconditional(&columns, &elements)
                                 }
+                                line.clear();
                             }
                         },
                         Err(_) => println!("Error en el programa")
@@ -173,7 +179,6 @@ fn print_file_unconditional(columns: &Vec<usize>, elements: &Vec<String> ) {
             counter += 1;
         }
     }
-    println!();
 }
 
 fn line_to_vec(line: &String) -> Vec<String> {
