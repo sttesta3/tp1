@@ -189,16 +189,18 @@ fn print_file_unconditional(columns: &[usize], elements: &[String]) {
     // Pre: Columns vector sorted incremental && Elements of line content vector
     // Post: print to stdout the correct columns
 
+    let mut first = true;
     if columns.is_empty() { // SELECT * FROM
         for (counter, element) in elements.iter().enumerate() {
-            print!("{}", element);
-            if counter < columns.len() - 1 {
-                print!(",");
+            if first {
+                print!("{}", element);
+                first = false;
+            } else {
+                print!(",{}", element);
             }
         }
     } else {                // SELECT columns FROM
         let mut counter = 0;
-        let mut first = true;
         while counter < elements.len() {
             if columns.contains(&counter) {
                 if first {
