@@ -75,19 +75,16 @@ fn find_filter_column(query: &Query) -> i32 {
                                 let mut line = String::new();
                                 match reader.read_line(&mut line) {
                                     Ok(_) => {
-                                        line = line.replace("\n", ""); 
+                                        line = line.replace('\n', ""); 
                                         let mut split = line.split(',');
                                         let mut element_opt = split.next();
                                         let mut counter = 0;
             
                                         while element_opt.is_some() && col_index_filter < 0 {
-                                            match element_opt {
-                                                Some(x) => { 
-                                                    if x.eq(column) {
-                                                        col_index_filter = counter;
-                                                    }
+                                            if let Some(x) = element_opt {
+                                                if x.eq(column) {
+                                                    col_index_filter = counter;
                                                 }
-                                                None => {}
                                             }
                                             counter += 1;    
                                             element_opt = split.next();
@@ -109,7 +106,7 @@ fn find_filter_column(query: &Query) -> i32 {
     col_index_filter
 }
 
-fn read_and_print_file(query: &Query, col_filter: i32, columns: &Vec<usize> ) {
+fn read_and_print_file(query: &Query, col_filter: i32, columns: &[usize] ) {
     match &query.table {
         Some(table) => match File::open(table) {
             Ok(f) => {
@@ -117,27 +114,27 @@ fn read_and_print_file(query: &Query, col_filter: i32, columns: &Vec<usize> ) {
                 let mut line = String::new();
 
                 // Print header    
-                match reader.read_line(&mut line) {
+/*                 match reader.read_line(&mut line) {
                     Ok(_) => {
-                        line = line.replace("\n", "");
+                        line = line.replace('\n', "");
                         println!("{}",line);
                         line.clear();
                     },
                     Err(_) => println!("Error en el programa")  // TODO
                 }                
-
+*/
                 // Print other lines
                 let mut read = true;
                 while read {
                     match reader.read_line(&mut line) {
                         Ok(x) => {
-                            line = line.replace("\n", "");
+                            line = line.replace('\n', "");
                             read = x != 0;
                             if read {
                                 let elements = line_to_vec(&line);
                                 match &query.where_condition {
                                     Some(condition) => {},
-                                    None => print_file_unconditional(&columns, &elements)
+                                    None => print_file_unconditional(columns, &elements)
                                 }
                                 line.clear();
                             }
@@ -152,20 +149,17 @@ fn read_and_print_file(query: &Query, col_filter: i32, columns: &Vec<usize> ) {
     }
 }
 
-fn print_file_unconditional(columns: &Vec<usize>, elements: &Vec<String> ) {
+fn print_file_unconditional(columns: &[usize], elements: &[String] ) {
     // Pre: Columns vector sorted incremental && Elements of line content vector 
     // Post: print to stdout the correct columns 
 
     if columns.is_empty(){
-        let mut counter = 0; 
-        for element in elements {
+        for (counter, element) in elements.iter().enumerate() {
             print!("{}",element);
             if counter < elements.len() - 1 {
                 print!(",");
             }
-
-            counter += 1;
-        }        
+        }
     } else {
         let mut counter = 0;
         let mut found_count = 0;
@@ -182,10 +176,10 @@ fn print_file_unconditional(columns: &Vec<usize>, elements: &Vec<String> ) {
             counter += 1;
         }
     }
-    println!("");
+    println!();
 }
 
-fn line_to_vec(line: &String) -> Vec<String> {
+fn line_to_vec(line: &str) -> Vec<String> {
     let mut result: Vec<String> = Vec::new();
     let mut split = line.split(',');
 

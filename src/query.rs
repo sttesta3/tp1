@@ -22,7 +22,7 @@ pub struct Query {
 }
 
 pub fn build_empty_query() -> Query {
-    return Query {
+    Query {
         operation:          None,
         table:              None,         
         columns:            None,    
