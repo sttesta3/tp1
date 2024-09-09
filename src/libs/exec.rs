@@ -1,5 +1,5 @@
-use std::io::{BufRead, BufReader};
-use std::fs::File;
+use std::io::{BufRead, BufReader, Write};
+use std::fs::{File,OpenOptions};
 
 //use crate::condition::operate_condition;
 use crate::query::query_type::QueryType;
@@ -24,7 +24,35 @@ fn exec_query_delete(query: Query) {
 }
 
 fn exec_query_insert(query: Query) {
-    // TODO
+    match &query.table {
+        Some(table) => {
+            let total_columns = find_total_columns(&query);
+            let write_columns = find_print_columns(&query);
+            match &mut OpenOptions::new().append(true).open(table){
+                Ok(file) => {
+                    let mut write_line = String::new();
+                    let mut counter = 0;
+                    let mut writen_elements = 0;
+                    while counter < total_columns {
+                        if write_columns.contains(&counter) {
+                            if let Some(x) = &query.values {
+                                write_line.push_str(&x[writen_elements].to_string());
+                                writen_elements += 1;
+                            }
+                        }
+
+                        counter += 1;
+                        if counter < total_columns {
+                            write_line.push(',');
+                        }                    }                    
+
+                    file.write(write_line.as_bytes());
+                },
+                Err(_) => println!("ERROR en el programa")
+            }
+        },
+        None => println!("ERROR en el programa")
+    }
 }
 
 fn exec_query_select(query: Query) {
@@ -35,6 +63,13 @@ fn exec_query_select(query: Query) {
             let print_columns: Vec<usize> = find_print_columns(&query);
             read_and_print_file(&query, col_index, &print_columns );
         }
+    }
+}
+
+fn find_total_columns(query: &Query) -> usize {
+    match get_file_first_line(query){
+        Some(line) => line_to_vec(&line).len(),
+        None => 0
     }
 }
 

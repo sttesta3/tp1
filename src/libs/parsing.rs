@@ -221,16 +221,16 @@ fn check_delete_format(args: &[String]) -> Result<QueryType, u32> {
 fn check_insert_format(args: &[String]) -> Result<QueryType, u32> {
     let non_valid_keywords = vec!["DELETE","FROM","SELECT","ORDER","BY","UPDATE","SET","WHERE","AND","OR","NOT"];
     if args[1].eq("INTO") && check_non_valid_keywords(args, non_valid_keywords){
-        if (args.len() - 3) % 2 != 0  {
+        if (args.len() - 4) % 2 != 0  {
             Err(2)
         } else{
             let mut counter = 0;
-            let correct_value_len = (args.len() - 3)/2;    // INSERT INTO a b c VALUES x y z. Len = 9. Correct len = 3.          
-            while counter < correct_value_len && ! args[counter].eq("VALUES"){
+            let correct_value_len = (args.len() - 4)/2;    // INSERT INTO tabla a b c VALUES x y z. Len = 10. Correct len = 3.          
+            while counter < correct_value_len && ! args[3 + counter].eq("VALUES"){
                 counter += 1;
             } 
     
-            if counter == correct_value_len && args[counter].eq("VALUES") {
+            if counter == correct_value_len && args[3 + counter].eq("VALUES") {
                 Ok(QueryType::INSERT)
             } else{
                 Err(error::INSERT_MAL_FORMATEADO)      
