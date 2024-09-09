@@ -75,6 +75,7 @@ fn find_filter_column(query: &Query) -> i32 {
                                 let mut line = String::new();
                                 match reader.read_line(&mut line) {
                                     Ok(_) => {
+                                        line = line.replace("\n", ""); 
                                         let mut split = line.split(',');
                                         let mut element_opt = split.next();
                                         let mut counter = 0;
@@ -118,7 +119,8 @@ fn read_and_print_file(query: &Query, col_filter: i32, columns: &Vec<usize> ) {
                 // Print header    
                 match reader.read_line(&mut line) {
                     Ok(_) => {
-                        print!("{}",line);
+                        line = line.replace("\n", "");
+                        println!("{}",line);
                         line.clear();
                     },
                     Err(_) => println!("Error en el programa")  // TODO
@@ -129,6 +131,7 @@ fn read_and_print_file(query: &Query, col_filter: i32, columns: &Vec<usize> ) {
                 while read {
                     match reader.read_line(&mut line) {
                         Ok(x) => {
+                            line = line.replace("\n", "");
                             read = x != 0;
                             if read {
                                 let elements = line_to_vec(&line);
@@ -179,6 +182,7 @@ fn print_file_unconditional(columns: &Vec<usize>, elements: &Vec<String> ) {
             counter += 1;
         }
     }
+    println!("");
 }
 
 fn line_to_vec(line: &String) -> Vec<String> {
