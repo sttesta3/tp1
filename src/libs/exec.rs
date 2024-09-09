@@ -1,5 +1,5 @@
+use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
-use std::fs::{File,OpenOptions};
 
 //use crate::condition::operate_condition;
 use crate::query::query_type::QueryType;
@@ -7,15 +7,15 @@ use crate::query::Query;
 
 use super::parsing::get_file_first_line;
 
-pub fn exec_query(query: Query)  {
+pub fn exec_query(query: Query) {
     match &query.operation {
         Some(op) => match op {
             QueryType::DELETE => exec_query_delete(query),
             QueryType::INSERT => exec_query_insert(query),
             QueryType::SELECT => exec_query_select(query),
-            QueryType::UPDATE => exec_query_update(query),    
+            QueryType::UPDATE => exec_query_update(query),
         },
-        None => println!("Error en el programa")
+        None => println!("Error en el programa"),
     }
 }
 
@@ -28,7 +28,7 @@ fn exec_query_insert(query: Query) {
         Some(table) => {
             let total_columns = find_total_columns(&query);
             let write_columns = find_print_columns(&query);
-            match &mut OpenOptions::new().append(true).open(table){
+            match &mut OpenOptions::new().append(true).open(table) {
                 Ok(file) => {
                     let mut write_line = String::new();
                     let mut counter = 0;
@@ -44,15 +44,16 @@ fn exec_query_insert(query: Query) {
                         counter += 1;
                         if counter < total_columns {
                             write_line.push(',');
-                        }                    
-                    }                    
+                        }
+                    }
 
-                    file.write(write_line.as_bytes());
-                },
-                Err(_) => println!("ERROR en el programa")
+                    write_line.push('\n');
+                    let _ = file.write(write_line.as_bytes());
+                }
+                Err(_) => println!("ERROR en el programa"),
             }
-        },
-        None => println!("ERROR en el programa")
+        }
+        None => println!("ERROR en el programa"),
     }
 }
 
@@ -62,15 +63,15 @@ fn exec_query_select(query: Query) {
         None => {
             let col_index = find_filter_column(&query);
             let print_columns: Vec<usize> = find_print_columns(&query);
-            read_and_print_file(&query, col_index, &print_columns );
+            read_and_print_file(&query, col_index, &print_columns);
         }
     }
 }
 
 fn find_total_columns(query: &Query) -> usize {
-    match get_file_first_line(query){
+    match get_file_first_line(query) {
         Some(line) => line_to_vec(&line).len(),
-        None => 0
+        None => 0,
     }
 }
 
@@ -82,83 +83,81 @@ fn find_print_columns(query: &Query) -> Vec<usize> {
                 let table_columns: Vec<String> = line_to_vec(&line);
                 for element in cols {
                     let mut counter = 0;
-                    while ! table_columns[counter].eq(element) && counter < table_columns.len() {
+                    while !table_columns[counter].eq(element) && counter < table_columns.len() {
                         counter += 1;
                     }
                     if counter < table_columns.len() {
                         result.push(counter);
                     }
                 }
-                
+
                 result
-            },
-            None => result
-        }, 
-        None => result
+            }
+            None => result,
+        },
+        None => result,
     }
 }
 
 fn find_filter_column(query: &Query) -> i32 {
     let mut col_index_filter = -1;
     match &query.where_condition {
-        Some(x) => {
-            match &x.column {
-                Some(column) => {
-                    match &query.table {
-                        Some(table) => match File::open(table){
-                            Ok(file) => {
-                                let mut reader: BufReader<File> = BufReader::new(file);
-                                let mut line = String::new();
-                                match reader.read_line(&mut line) {
-                                    Ok(_) => {
-                                        line = line.replace('\n', ""); 
-                                        let mut split = line.split(',');
-                                        let mut element_opt = split.next();
-                                        let mut counter = 0;
-            
-                                        while element_opt.is_some() && col_index_filter < 0 {
-                                            if let Some(x) = element_opt {
-                                                if x.eq(column) {
-                                                    col_index_filter = counter;
-                                                }
-                                            }
-                                            counter += 1;    
-                                            element_opt = split.next();
+        Some(x) => match &x.column {
+            Some(column) => match &query.table {
+                Some(table) => match File::open(table) {
+                    Ok(file) => {
+                        let mut reader: BufReader<File> = BufReader::new(file);
+                        let mut line = String::new();
+                        match reader.read_line(&mut line) {
+                            Ok(_) => {
+                                line = line.replace('\n', "");
+                                let mut split = line.split(',');
+                                let mut element_opt = split.next();
+                                let mut counter = 0;
+
+                                while element_opt.is_some() && col_index_filter < 0 {
+                                    if let Some(x) = element_opt {
+                                        if x.eq(column) {
+                                            col_index_filter = counter;
                                         }
-                                    },
-                                    Err(_) => col_index_filter = -1,
-                                }            
-                            },
-                            Err(_) => return -1
-                        },
-                        None => return -1
+                                    }
+                                    counter += 1;
+                                    element_opt = split.next();
+                                }
+                            }
+                            Err(_) => col_index_filter = -1,
+                        }
                     }
+                    Err(_) => return -1,
                 },
-                None => { col_index_filter = -1; }
+                None => return -1,
+            },
+            None => {
+                col_index_filter = -1;
             }
-        }, 
-        None => col_index_filter = -1 
+        },
+        None => col_index_filter = -1,
     }
     col_index_filter
 }
 
-fn read_and_print_file(query: &Query, col_filter: i32, columns: &[usize] ) {
+fn read_and_print_file(query: &Query, col_filter: i32, columns: &[usize]) {
     match &query.table {
         Some(table) => match File::open(table) {
             Ok(f) => {
                 let mut reader: BufReader<File> = BufReader::new(f);
                 let mut line = String::new();
 
-                // Print header    
-/*                 match reader.read_line(&mut line) {
-                    Ok(_) => {
-                        line = line.replace('\n', "");
-                        println!("{}",line);
-                        line.clear();
-                    },
-                    Err(_) => println!("Error en el programa")  // TODO
-                }                
-*/
+                // Print header
+                /*                 match reader.read_line(&mut line) {
+                                    Ok(_) => {
+                                        line = line.replace('\n', "");
+                                        println!("{}",line);
+                                        line.clear();
+                                    },
+                                    Err(_) => println!("Error en el programa")  // TODO
+                                }
+                */
                 // Print other lines
                 let mut read = true;
                 while read {
@@ -169,29 +168,29 @@ fn read_and_print_file(query: &Query, col_filter: i32, columns: &[usize] ) {
                             if read {
                                 let elements = line_to_vec(&line);
                                 match &query.where_condition {
-                                    Some(condition) => {},
-                                    None => print_file_unconditional(columns, &elements)
+                                    Some(condition) => {}
+                                    None => print_file_unconditional(columns, &elements),
                                 }
                                 line.clear();
                             }
-                        },
-                        Err(_) => println!("Error en el programa")
+                        }
+                        Err(_) => println!("Error en el programa"),
                     }
                 }
-            },
-            Err(_) => println!("Error en el programa")
+            }
+            Err(_) => println!("Error en el programa"),
         },
-        None => println!("Error en el programa ")
+        None => println!("Error en el programa "),
     }
 }
 
-fn print_file_unconditional(columns: &[usize], elements: &[String] ) {
-    // Pre: Columns vector sorted incremental && Elements of line content vector 
-    // Post: print to stdout the correct columns 
+fn print_file_unconditional(columns: &[usize], elements: &[String]) {
+    // Pre: Columns vector sorted incremental && Elements of line content vector
+    // Post: print to stdout the correct columns
 
-    if columns.is_empty(){
+    if columns.is_empty() {
         for (counter, element) in elements.iter().enumerate() {
-            print!("{}",element);
+            print!("{}", element);
             if counter < elements.len() - 1 {
                 print!(",");
             }
@@ -202,9 +201,9 @@ fn print_file_unconditional(columns: &[usize], elements: &[String] ) {
         while counter < elements.len() {
             if columns.contains(&counter) {
                 if found_count == 0 {
-                    print!("{}",elements[counter]);
+                    print!("{}", elements[counter]);
                 } else {
-                    print!(",{}",elements[counter]);
+                    print!(",{}", elements[counter]);
                 }
                 found_count += 1;
             }
@@ -224,8 +223,8 @@ fn line_to_vec(line: &str) -> Vec<String> {
         match element_opt {
             Some(x) => {
                 result.push(x.to_string());
-            },
-            None => continue    
+            }
+            None => continue,
         }
 
         element_opt = split.next();
@@ -233,9 +232,7 @@ fn line_to_vec(line: &str) -> Vec<String> {
     result
 }
 
-fn exec_query_select_order_by(query: Query) {
-
-}
+fn exec_query_select_order_by(query: Query) {}
 
 fn exec_query_update(query: Query) {
     // TODO

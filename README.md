@@ -22,6 +22,8 @@ Pendientes:
 
 7. Cargo clippy sin warnings 
 
+8. Documentación de funciones
+
 Funcionalidades probadas OK
 
 1. SELECT * FROM 

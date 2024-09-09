@@ -1,5 +1,5 @@
 pub mod condition_type;
-/* 
+/*
 pub mod complex_condition;
 
 use crate::libs::error;
@@ -9,20 +9,20 @@ use condition_type::BooleanOperator;
 use condition_type::ConditionOperator;
 
 pub struct Condition {
-    pub condition:  ConditionOperator,
-    pub column:     Option<String>,
-    pub value:      Option<String>,
+    pub condition: ConditionOperator,
+    pub column: Option<String>,
+    pub value: Option<String>,
 }
 
 pub fn build_condition(column: String, value: String, cond: ConditionOperator) -> Condition {
     Condition {
-        condition:  cond,
-        column:     Some(column),
-        value:      Some(value),
+        condition: cond,
+        column: Some(column),
+        value: Some(value),
     }
 }
 
-/* 
+/*
 pub fn operate_condition(filter: (&u32,&ConditionOperator,&String), elements: &Vec<String>) -> bool {
     let (column, operator, value) = filter;
     match operator {
