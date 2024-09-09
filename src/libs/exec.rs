@@ -220,7 +220,7 @@ fn print_file_unconditional(columns: &[usize], elements: &[String]) {
 fn print_file_conditioned(columns: &[usize], filter: (i32, &Condition), elements: &[String]) {
     let (col_filter,condition) = filter;
     if let Some(value) = &condition.value {
-        if operate_condition(value, &elements[col_filter as usize], &condition.condition) {
+        if operate_condition(&elements[col_filter as usize], value, &condition.condition) {
             print_file_unconditional(columns, elements)
         }
     } else {

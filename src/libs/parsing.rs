@@ -180,31 +180,36 @@ fn separate_args_select(args: &[String], path: &String, result: &mut Query) -> R
                         args[counter].to_string(),
                         args[counter + 2].to_string(),
                         ConditionOperator::Minor,
-                    ))
+                    ));
+                    counter += 3;
                 } else if args[counter + 1].eq("<=") {
                     result.where_condition = Some(build_condition(
                         args[counter].to_string(),
                         args[counter + 2].to_string(),
                         ConditionOperator::MinorEqual,
-                    ))
+                    ));
+                    counter += 3;
                 } else if args[counter + 1].eq("=") {
                     result.where_condition = Some(build_condition(
                         args[counter].to_string(),
                         args[counter + 2].to_string(),
                         ConditionOperator::Equal,
-                    ))
+                    ));
+                    counter += 3;
                 } else if args[counter + 1].eq(">=") {
                     result.where_condition = Some(build_condition(
                         args[counter].to_string(),
                         args[counter + 2].to_string(),
                         ConditionOperator::HigherEqual,
-                    ))
+                    ));
+                    counter += 3;
                 } else if args[counter + 1].eq(">") {
                     result.where_condition = Some(build_condition(
                         args[counter].to_string(),
                         args[counter + 2].to_string(),
                         ConditionOperator::Higher,
-                    ))
+                    ));
+                    counter += 3;
                 } else {
                     return Err(error::WHERE_MAL_FORMATEADO);
                 }
