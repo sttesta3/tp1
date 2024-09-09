@@ -2,7 +2,7 @@ use std::io::{BufRead, BufReader};
 use std::fs::File;
 
 use crate::condition::condition_type::ConditionOperator;
-use crate::condition::{build_condition, Condition};
+use crate::condition::build_condition ;
 //use crate::condition::{add_node_to_tree, build_complex_condition, build_condition, build_empty_complex_condition, get_where_columns, tree_check, ComplexCondition, Condition};
 // use crate::condition::Condition;
 use crate::libs::error;
@@ -106,12 +106,12 @@ fn separate_args_update(args: &Vec<String>, path: &String, result: &mut Query) -
             } 
             counter += 1;
         }
-        counter += 1;
     
         result.columns = Some(columns);
         result.values = Some(values);
 
-        /* TODO: Code for complex conditions    
+        /* TODO: Code for complex conditions 
+        counter += 1;   
         match add_node_to_tree(args, &mut counter, build_empty_complex_condition()) {
             Ok(cond) => result.where_condition = Some(cond),
             Err(x) => return Err(x)
@@ -276,66 +276,6 @@ fn check_non_valid_keywords(args: &Vec<String>, non_valid_keywords:  Vec<&str>) 
 
     result
 }
-
-fn check_where_format(args: &Vec<String>, start_position: usize) -> bool {
-    let mut result = true;
-
-    let mut counter: usize   = start_position;
-
-    let mut not_detected: bool = false;
-    let mut op_detected: bool = false;
-
-    while counter < args.len() && result {
-        if args[counter].eq("NOT") {
-            if not_detected || op_detected {
-                result = false;  // NOT NOT. Que estas haciendo ?
-            } else {
-                not_detected = true;
-                counter += 1;
-            }
-        } else if args[counter].eq("AND") || args[counter].eq("OR")  {
-            if op_detected {
-                result = false;  // AND OR , OR AND, OR OR, AND AND. Que estas haciendo ? 
-            } else {
-                op_detected = true;
-                counter += 1;
-            }
-        } else {
-            if counter + 3 > args.len() {
-                result = false; 
-            } else {
-
-            }
-        }
-    }
-
-    result
-}
-
-fn check_table_exist(path: &String, args: &Vec<String>, operation: &QueryType) -> Result<String, u32>{
-    // Asume query bien formateado 
-    let mut table= String::from(path);
-    table.push('/');
-    match &operation {
-        QueryType::DELETE => table.push_str(&args[2]),
-        QueryType::INSERT => table.push_str(&args[2]),
-        QueryType::SELECT => {  
-            // Debo encontrar cual es la tabla (asumiendo query bien formateado) 
-            let mut counter = 2;
-            while ! args[counter].eq("FROM"){ 
-                counter += 1;
-            }
-            table.push_str(&args[counter + 1])
-        },
-        QueryType::UPDATE => table.push_str(&args[1]),
-    }
-    
-    match File::open(&table) { // TODO: Path::exist()?
-        Ok(_) => return Ok(table),  
-        Err(_) => return Err(error::ARCHIVO_NO_PUDO_SER_ABIERTO)    
-    }
-}
-
 
 fn validate_query(query: Query) -> Result<Query,u32> {
     // Pre: Sintactical query OK 
@@ -535,3 +475,62 @@ mod tests {
 
 
 }
+
+/*
+fn check_where_format(args: &Vec<String>, start_position: usize) -> bool {
+    let mut result = true;
+
+    let mut counter: usize   = start_position;
+
+    let mut not_detected: bool = false;
+    let mut op_detected: bool = false;
+
+    while counter < args.len() && result {
+        if args[counter].eq("NOT") {
+            if not_detected || op_detected {
+                result = false;  // NOT NOT. Que estas haciendo ?
+            } else {
+                not_detected = true;
+                counter += 1;
+            }
+        } else if args[counter].eq("AND") || args[counter].eq("OR")  {
+            if op_detected {
+                result = false;  // AND OR , OR AND, OR OR, AND AND. Que estas haciendo ? 
+            } else {
+                op_detected = true;
+                counter += 1;
+            }
+        } else if counter + 3 > args.len() {
+            result = false;
+        } else {
+
+        }
+    }
+
+    result
+}
+
+fn check_table_exist(path: &String, args: &Vec<String>, operation: &QueryType) -> Result<String, u32>{
+    // Asume query bien formateado 
+    let mut table= String::from(path);
+    table.push('/');
+    match &operation {
+        QueryType::DELETE => table.push_str(&args[2]),
+        QueryType::INSERT => table.push_str(&args[2]),
+        QueryType::SELECT => {  
+            // Debo encontrar cual es la tabla (asumiendo query bien formateado) 
+            let mut counter = 2;
+            while ! args[counter].eq("FROM"){ 
+                counter += 1;
+            }
+            table.push_str(&args[counter + 1])
+        },
+        QueryType::UPDATE => table.push_str(&args[1]),
+    }
+    
+    match File::open(&table) { // TODO: Path::exist()?
+        Ok(_) => return Ok(table),  
+        Err(_) => return Err(error::ARCHIVO_NO_PUDO_SER_ABIERTO)    
+    }
+}
+*/

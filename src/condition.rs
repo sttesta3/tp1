@@ -1,5 +1,4 @@
 pub mod condition_type;
-use crate::query::Query;
 /* 
 pub mod complex_condition;
 
@@ -15,9 +14,9 @@ pub struct Condition {
     pub value:      Option<String>,
 }
 
-pub fn build_condition(column: String, value: String, condition: ConditionOperator) -> Condition {
-    return Condition {
-        condition:  condition,
+pub fn build_condition(column: String, value: String, cond: ConditionOperator) -> Condition {
+    Condition {
+        condition:  cond,
         column:     Some(column),
         value:      Some(value),
     }
