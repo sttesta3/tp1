@@ -44,7 +44,8 @@ fn exec_query_insert(query: Query) {
                         counter += 1;
                         if counter < total_columns {
                             write_line.push(',');
-                        }                    }                    
+                        }                    
+                    }                    
 
                     file.write(write_line.as_bytes());
                 },

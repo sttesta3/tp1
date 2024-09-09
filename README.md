@@ -4,11 +4,31 @@
 
 ### Detalles de entrega
 
-El trabajo no se encuentra completo. Las siguientes funcionalidades se encuentran pendientes:
+El trabajo no se encuentra completo. 
 
-1. Logica booleana
+Pendientes:
 
-2. 
+1. Funcionalidad: Logica booleana en WHERE
+
+2. Funcionalidad: SELECT c/ ORDER BY
+
+3. Funcionalidad: SELECT c/ WHERE
+
+4. Funcionalidad: DELETE 
+
+5. Funcionalidad: UPDATE 
+
+6. Testing (mas test unitarios e integración)
+
+7. Cargo clippy sin warnings 
+
+Funcionalidades probadas OK
+
+1. SELECT * FROM 
+
+2. SELECT columnas FROM 
+
+3. INSERT INTO 
 
 ### Detalles de implementación
 
