@@ -134,7 +134,12 @@ fn separate_args_select(args: &Vec<String>, path: &String, result: &mut Query) -
             counter += 1;
         }
         counter += 1;
-        result.columns = Some(columns);
+
+        
+        if ! &columns[0].eq("*") {
+            result.columns = Some(columns);
+        }
+
         result.table = Some(merge_table_and_path(path, &args[counter]));
         counter += 1;
         
