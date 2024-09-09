@@ -1,6 +1,7 @@
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
 
+use crate::condition::{self, operate_condition, Condition};
 //use crate::condition::operate_condition;
 use crate::query::query_type::QueryType;
 use crate::query::Query;
@@ -168,7 +169,7 @@ fn read_and_print_file(query: &Query, col_filter: i32, columns: &[usize]) {
                             if read {
                                 let elements = line_to_vec(&line);
                                 match &query.where_condition {
-                                    Some(condition) => {}
+                                    Some(condition) => print_file_conditioned(columns, (col_filter, condition), &elements),
                                     None => print_file_unconditional(columns, &elements),
                                 }
                                 line.clear();
@@ -188,30 +189,41 @@ fn print_file_unconditional(columns: &[usize], elements: &[String]) {
     // Pre: Columns vector sorted incremental && Elements of line content vector
     // Post: print to stdout the correct columns
 
-    if columns.is_empty() {
+    if columns.is_empty() { // SELECT * FROM
         for (counter, element) in elements.iter().enumerate() {
             print!("{}", element);
-            if counter < elements.len() - 1 {
+            if counter < columns.len() - 1 {
                 print!(",");
             }
         }
-    } else {
+    } else {                // SELECT columns FROM
         let mut counter = 0;
-        let mut found_count = 0;
+        let mut first = true;
         while counter < elements.len() {
             if columns.contains(&counter) {
-                if found_count == 0 {
+                if first {
                     print!("{}", elements[counter]);
+                    first = false;
                 } else {
                     print!(",{}", elements[counter]);
                 }
-                found_count += 1;
             }
 
             counter += 1;
         }
     }
     println!();
+}
+
+fn print_file_conditioned(columns: &[usize], filter: (i32, &Condition), elements: &[String]) {
+    let (col_filter,condition) = filter;
+    if let Some(value) = &condition.value {
+        if operate_condition(value, &elements[col_filter as usize], &condition.condition) {
+            print_file_unconditional(columns, elements)
+        }
+    } else {
+        print_file_unconditional(columns, elements)
+    }
 }
 
 fn line_to_vec(line: &str) -> Vec<String> {

@@ -22,15 +22,25 @@ pub fn build_condition(column: String, value: String, cond: ConditionOperator) -
     }
 }
 
-/*
-pub fn operate_condition(filter: (&u32,&ConditionOperator,&String), elements: &Vec<String>) -> bool {
-    let (column, operator, value) = filter;
+pub fn operate_condition(v1: &String, v2: &String, operator: &ConditionOperator ) -> bool {
+    if let Ok(x1) = v1.parse::<i32>() {
+        if let Ok(x2) = v2.parse::<i32>() {
+            match operator {
+                ConditionOperator::Minor => return x1 < x2,
+                ConditionOperator::MinorEqual => return x1 <= x2,
+                ConditionOperator::Equal => return x1 == x2,
+                ConditionOperator::Higher => return x1 > x2,
+                ConditionOperator::HigherEqual => return x1 >= x2,
+            }
+        };    
+    };
+
     match operator {
-        ConditionOperator::Minor => {},
-        ConditionOperator::MinorEqual => {},
-        ConditionOperator::Equal => {},
-        ConditionOperator::Higher => {},
-        ConditionOperator::HigherEqual => {},
+        ConditionOperator::Minor => true,
+        ConditionOperator::MinorEqual => true,
+        ConditionOperator::Equal => v1.eq(v2),
+        ConditionOperator::Higher => true,
+        ConditionOperator::HigherEqual => true,
     }
 }
-*/
+
