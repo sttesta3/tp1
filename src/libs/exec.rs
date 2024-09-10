@@ -21,7 +21,26 @@ pub fn exec_query(query: Query) {
 }
 
 fn exec_query_delete(query: Query) {
-    // TODO
+    // CREATE .table.tmp 
+    
+}
+
+fn get_tmp_file_name(query: &Query) -> Option<String> {
+    match &query.table {
+        Some(line) => {
+            let mut output = String::new();
+            let last_item_index = line.split('/').enumerate().count() - 1;
+            for (counter, element) in line.split('/').enumerate() {
+                if counter == last_item_index {
+                    output.push('.');
+                }
+
+                output.push_str(&element.to_string());
+            }
+            Some(output)
+        }, 
+        None => None
+    }
 }
 
 fn exec_query_insert(query: Query) {
