@@ -6,6 +6,7 @@ use crate::condition::{self, operate_condition, Condition};
 use crate::query::query_type::QueryType;
 use crate::query::Query;
 
+use super::error;
 use super::parsing::get_file_first_line;
 
 pub fn exec_query(query: Query) {
@@ -23,16 +24,32 @@ fn exec_query_delete(query: Query) {
     // CREATE .table.tmp 
     if let Some(cond) = &query.where_condition {
         if let Some(table) = &query.table {
-            if let Ok(file) = File::open(table){
-                if let Ok(tmp_file) = File::open(get_tmp_file_name(table)) {
-                    let col_index = find_filter_column(&query);
-                    let mut reader: BufReader<File> = BufReader::new(file);
-                    let mut line = String::new();
-                    
-                    if let Ok(x) = reader.read_line(&mut line) {
+            if let Ok(mut tmp_file) = File::create(get_tmp_file_name(table)) {
+                if let Ok(file) = File::open(table){
+                    if let Some(value) = &cond.value {
+                        let col_index = find_filter_column(&query);
+                        let mut reader: BufReader<File> = BufReader::new(file);
+                        let mut line = String::new();
                         
+                        let mut read = true;
+                        while read {
+                            if let Ok(x) = reader.read_line(&mut line) {
+                                line = line.replace('\n', "");
+                                read = x != 0;
+                                if read {
+                                    let elements = line_to_vec(&line);
+                                    if ! operate_condition(&elements[col_index as usize], value, &cond.condition) {
+                                        line.push('\n');
+                                        if let Err(_error) = tmp_file.write(line.as_bytes()) {
+                                            println!("Error en delete")
+                                        }
+                                    }
+                                }
+                                line.clear();
+                            }
+                        }
                     }
-                }    
+                }   
             }
         }
     }
@@ -49,6 +66,10 @@ fn get_tmp_file_name(table: &String) -> String {
         }
 
         output.push_str(&element.to_string());
+
+        if counter < last_item_index {
+            output.push('/');
+        }
     }
     output
 }
