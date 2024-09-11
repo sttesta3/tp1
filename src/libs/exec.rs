@@ -9,45 +9,55 @@ use crate::query::Query;
 use super::parsing::get_file_first_line;
 
 pub fn exec_query(query: Query) {
-    match &query.operation {
-        Some(op) => match op {
+    if let Some(op) = &query.operation {
+        match op {
             QueryType::DELETE => exec_query_delete(query),
             QueryType::INSERT => exec_query_insert(query),
             QueryType::SELECT => exec_query_select(query),
             QueryType::UPDATE => exec_query_update(query),
-        },
-        None => println!("Error en el programa"),
+        }
     }
 }
 
 fn exec_query_delete(query: Query) {
     // CREATE .table.tmp 
-    
-}
-
-fn get_tmp_file_name(query: &Query) -> Option<String> {
-    match &query.table {
-        Some(line) => {
-            let mut output = String::new();
-            let last_item_index = line.split('/').enumerate().count() - 1;
-            for (counter, element) in line.split('/').enumerate() {
-                if counter == last_item_index {
-                    output.push('.');
-                }
-
-                output.push_str(&element.to_string());
+    if let Some(cond) = &query.where_condition {
+        if let Some(table) = &query.table {
+            if let Ok(file) = File::open(table){
+                if let Ok(tmp_file) = File::open(get_tmp_file_name(table)) {
+                    let col_index = find_filter_column(&query);
+                    let mut reader: BufReader<File> = BufReader::new(file);
+                    let mut line = String::new();
+                    
+                    if let Ok(x) = reader.read_line(&mut line) {
+                        
+                    }
+                }    
             }
-            Some(output)
-        }, 
-        None => None
+        }
     }
 }
 
+fn get_tmp_file_name(table: &String) -> String {
+    // Pre: Path and name to file. ruta/a/tablas/tabla.csv
+    // Post: same file but starting with period, as long as it's a hidden file
+    let mut output = String::new();
+    let last_item_index = table.split('/').enumerate().count() - 1;
+    for (counter, element) in table.split('/').enumerate() {
+        if counter == last_item_index {
+            output.push('.');
+        }
+
+        output.push_str(&element.to_string());
+    }
+    output
+}
+
 fn exec_query_insert(query: Query) {
-    match &query.table {
-        Some(table) => {
-            let total_columns = find_total_columns(&query);
-            let write_columns = find_print_columns(&query);
+    if let Some(table) = &query.table {
+        let total_columns = find_total_columns(&query);
+        let write_columns = find_print_columns(&query);
+            
             match &mut OpenOptions::new().append(true).open(table) {
                 Ok(file) => {
                     let mut write_line = String::new();
@@ -69,12 +79,10 @@ fn exec_query_insert(query: Query) {
 
                     write_line.push('\n');
                     let _ = file.write(write_line.as_bytes());
-                }
+                },
                 Err(_) => println!("ERROR en el programa"),
             }
         }
-        None => println!("ERROR en el programa"),
-    }
 }
 
 fn exec_query_select(query: Query) {
@@ -162,45 +170,27 @@ fn find_filter_column(query: &Query) -> i32 {
 }
 
 fn read_and_print_file(query: &Query, col_filter: i32, columns: &[usize]) {
-    match &query.table {
-        Some(table) => match File::open(table) {
-            Ok(f) => {
-                let mut reader: BufReader<File> = BufReader::new(f);
-                let mut line = String::new();
+    if let Some(table) = &query.table {
+        if let Ok(f) = File::open(table) {
+            let mut reader: BufReader<File> = BufReader::new(f);
+            let mut line = String::new();
 
-                // Print header
-                /*                 match reader.read_line(&mut line) {
-                                    Ok(_) => {
-                                        line = line.replace('\n', "");
-                                        println!("{}",line);
-                                        line.clear();
-                                    },
-                                    Err(_) => println!("Error en el programa")  // TODO
-                                }
-                */
-                // Print other lines
-                let mut read = true;
-                while read {
-                    match reader.read_line(&mut line) {
-                        Ok(x) => {
-                            line = line.replace('\n', "");
-                            read = x != 0;
-                            if read {
-                                let elements = line_to_vec(&line);
-                                match &query.where_condition {
-                                    Some(condition) => print_file_conditioned(columns, (col_filter, condition), &elements),
-                                    None => print_file_unconditional(columns, &elements),
-                                }
-                                line.clear();
-                            }
+            let mut read = true;
+            while read {
+                if let Ok(x) = reader.read_line(&mut line) {
+                    line = line.replace('\n', "");
+                    read = x != 0;
+                    if read {
+                        let elements = line_to_vec(&line);
+                        match &query.where_condition {
+                            Some(condition) => print_file_conditioned(columns, (col_filter, condition), &elements),
+                            None => print_file_unconditional(columns, &elements),
                         }
-                        Err(_) => println!("Error en el programa"),
+                        line.clear();
                     }
                 }
             }
-            Err(_) => println!("Error en el programa"),
-        },
-        None => println!("Error en el programa "),
+        }
     }
 }
 
