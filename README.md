@@ -12,15 +12,13 @@ Pendientes:
 
 2. Funcionalidad: SELECT c/ ORDER BY
 
-3. Funcionalidad: DELETE 
+3. Funcionalidad: UPDATE 
 
-4. Funcionalidad: UPDATE 
+4. Testing (mas test unitarios e integración)
 
-5. Testing (mas test unitarios e integración)
+5. Cargo clippy sin warnings 
 
-6. Cargo clippy sin warnings 
-
-7. Documentación de funciones
+6. Documentación de funciones
 
 Funcionalidades probadas OK
 
@@ -31,6 +29,9 @@ Funcionalidades probadas OK
 3. SELECT c/ WHERE (basico)
 
 4. INSERT INTO 
+
+5. DELETE  FROM WHERE (basico)
+
 
 ### Detalles de implementación
 

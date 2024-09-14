@@ -1,12 +1,11 @@
 use std::fs::{remove_file, rename, File, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
 
-use crate::condition::{self, operate_condition, Condition};
+use crate::condition::{operate_condition, Condition};
 //use crate::condition::operate_condition;
 use crate::query::query_type::QueryType;
 use crate::query::Query;
 
-use super::error;
 use super::parsing::get_file_first_line;
 
 pub fn exec_query(query: Query) {
@@ -48,7 +47,8 @@ fn exec_query_delete(query: Query) {
                                         ) {
                                             line.push('\n');
                                             if let Err(_error) = tmp_file.write(line.as_bytes()) {
-                                                println!("Error en delete")
+                                                read = false;
+                                                valid_operation = false;
                                             }
                                         }
                                     }
@@ -64,21 +64,28 @@ fn exec_query_delete(query: Query) {
                     Err(_) => valid_operation = false,
                 }
 
-                if valid_operation {
-                    if let Ok(_) = remove_file(table) {
-                        let _ = rename(tmp_file_name, table);
-                    } else {
-                        let _ = remove_file(tmp_file_name);
-                    }
-                } else {
-                    let _ = remove_file(tmp_file_name);
+                if let Err(_) = remove_old_file(table, &tmp_file_name, valid_operation) {
+                    println!("Error en manipulación de archivos");
                 }
             }
         }
     }
 }
 
-fn remove_tmp_file() {}
+fn remove_old_file(file: &String, tmp_file: &String, valid_operation: bool) -> Result<u32, u32> {
+    if valid_operation {
+        if let Ok(_) = remove_file(file) {
+            let _ = rename(tmp_file, file);
+            Ok(0)
+        } else {
+            let _ = remove_file(tmp_file);
+            Err(1)
+        }
+    } else {
+        let _ = remove_file(tmp_file);
+        Err(2)
+    }
+}
 
 fn get_tmp_file_name(table: &String) -> String {
     // Pre: Path and name to file. ruta/a/tablas/tabla.csv
@@ -246,13 +253,11 @@ fn print_file_unconditional(columns: &[usize], elements: &[String]) {
     // Pre: Columns vector sorted incremental && Elements of line content vector
     // Post: print to stdout the correct columns
 
-    let mut first = true;
     if columns.is_empty() {
         // SELECT * FROM
         for (counter, element) in elements.iter().enumerate() {
-            if first {
+            if counter == 0 {
                 print!("{}", element);
-                first = false;
             } else {
                 print!(",{}", element);
             }
@@ -262,9 +267,8 @@ fn print_file_unconditional(columns: &[usize], elements: &[String]) {
         let mut counter = 0;
         while counter < elements.len() {
             if columns.contains(&counter) {
-                if first {
+                if counter == 0 {
                     print!("{}", elements[counter]);
-                    first = false;
                 } else {
                     print!(",{}", elements[counter]);
                 }
@@ -305,8 +309,66 @@ fn line_to_vec(line: &str) -> Vec<String> {
     result
 }
 
-fn exec_query_select_order_by(query: Query) {}
+fn exec_query_select_order_by(query: Query) {
+    // TODO
+}
 
 fn exec_query_update(query: Query) {
-    // TODO
+    if let Some(cond) = &query.where_condition {
+        if let Some(value) = &cond.value {
+            if let Some(columns) = &query.columns {
+                if let Some(values) = &query.values {
+                    if let Some(table) = &query.table {
+                        let tmp_file = get_tmp_file_name(table);
+                        let mut valid_operation = true;
+                        match File::open(table) {
+                            Ok(file) => match File::create(&tmp_file) {
+                                Ok(mut tmp_file) => {
+                                    let col_index = find_filter_column(&query);
+                                    let mut reader: BufReader<File> = BufReader::new(file);
+                                    let mut line = String::new();
+
+                                    let mut read = true;
+                                    while read {
+                                        if let Ok(x) = reader.read_line(&mut line) {
+                                            line = line.replace('\n', "");
+                                            read = x != 0;
+                                            if read {
+                                                let elements = line_to_vec(&line);
+                                                if !operate_condition(
+                                                    &elements[col_index as usize],
+                                                    value,
+                                                    &cond.condition,
+                                                ) {
+                                                    // Line not updated
+                                                    line.push('\n');
+                                                    if let Err(_error) =
+                                                        tmp_file.write(line.as_bytes())
+                                                    {
+                                                        read = false;
+                                                        valid_operation = false;
+                                                    }
+                                                } else { // Updated Line
+                                                }
+                                            }
+                                            line.clear();
+                                        } else {
+                                            read = false;
+                                            valid_operation = false;
+                                        }
+                                    }
+                                }
+                                Err(_) => valid_operation = false,
+                            },
+                            Err(_) => valid_operation = false,
+                        }
+
+                        if let Err(_) = remove_old_file(table, &tmp_file, valid_operation) {
+                            println!("Error en manipulación de archivos");
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
