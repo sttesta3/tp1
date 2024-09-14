@@ -28,7 +28,7 @@ Funcionalidades probadas OK
 
 2. SELECT columnas FROM 
 
-3. SELECT c/ WHERE
+3. SELECT c/ WHERE (basico)
 
 4. INSERT INTO 
 

@@ -1,4 +1,4 @@
-use std::fs::{File, OpenOptions};
+use std::fs::{remove_file, rename, File, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
 
 use crate::condition::{self, operate_condition, Condition};
@@ -21,38 +21,63 @@ pub fn exec_query(query: Query) {
 }
 
 fn exec_query_delete(query: Query) {
-    // CREATE .table.tmp 
     if let Some(cond) = &query.where_condition {
-        if let Some(table) = &query.table {
-            if let Ok(mut tmp_file) = File::create(get_tmp_file_name(table)) {
-                if let Ok(file) = File::open(table){
-                    if let Some(value) = &cond.value {
-                        let col_index = find_filter_column(&query);
-                        let mut reader: BufReader<File> = BufReader::new(file);
-                        let mut line = String::new();
+        if let Some(value) = &cond.value {
+            if let Some(table) = &query.table {         // Check conditions for query. if not, don't do anything
+                let tmp_file_name = get_tmp_file_name(table);
+                let mut valid_operation = true;
+                match File::open(table) {
+                    Ok(file) => {
+                        match File::create(&tmp_file_name) {
+                            Ok(mut tmp_file) => {
+                                let col_index = find_filter_column(&query);
+                                let mut reader: BufReader<File> = BufReader::new(file);
+                                let mut line = String::new();
                         
-                        let mut read = true;
-                        while read {
-                            if let Ok(x) = reader.read_line(&mut line) {
-                                line = line.replace('\n', "");
-                                read = x != 0;
-                                if read {
-                                    let elements = line_to_vec(&line);
-                                    if ! operate_condition(&elements[col_index as usize], value, &cond.condition) {
-                                        line.push('\n');
-                                        if let Err(_error) = tmp_file.write(line.as_bytes()) {
-                                            println!("Error en delete")
+                                let mut read = true;
+                                while read {
+                                    if let Ok(x) = reader.read_line(&mut line) {
+                                        line = line.replace('\n', "");
+                                        read = x != 0;
+                                        if read {
+                                            let elements = line_to_vec(&line);
+                                            if ! operate_condition(&elements[col_index as usize], value, &cond.condition) {
+                                                line.push('\n');
+                                                if let Err(_error) = tmp_file.write(line.as_bytes()) {
+                                                    println!("Error en delete")
+                                                }
+                                            }
                                         }
+                                        line.clear();
+                                    } else{
+                                        read = false;
+                                        valid_operation = false;
                                     }
                                 }
-                                line.clear();
-                            }
+                            },
+                            Err(_) => valid_operation = false
                         }
+                    },
+                    Err(_) => valid_operation = false
+                }
+
+                if valid_operation {
+                    if let Ok(_) = remove_file(table){
+                        let _ = rename(tmp_file_name, table);
+                    } else {
+                        let _ = remove_file(tmp_file_name);
                     }
-                }   
+                }
+                else {
+                    let _ = remove_file(tmp_file_name);
+                }
             }
         }
     }
+}
+
+fn remove_tmp_file(){
+
 }
 
 fn get_tmp_file_name(table: &String) -> String {
