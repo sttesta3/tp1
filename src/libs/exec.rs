@@ -108,32 +108,34 @@ fn get_tmp_file_name(table: &String) -> String {
 
 fn exec_query_insert(query: Query) {
     if let Some(table) = &query.table {
-        let total_columns = find_total_columns(&query);
-        let write_columns = find_print_columns(&query);
+        if let Some(write_columns) = &query.columns {
+            let total_columns = find_total_columns(&query);
+//        let write_columns = find_print_columns(&query);
 
-        match &mut OpenOptions::new().append(true).open(table) {
-            Ok(file) => {
-                let mut write_line = String::new();
-                let mut counter = 0;
-                let mut writen_elements = 0;
-                while counter < total_columns {
-                    if write_columns.contains(&counter) {
-                        if let Some(x) = &query.values {
-                            write_line.push_str(&x[writen_elements].to_string());
-                            writen_elements += 1;
+            match &mut OpenOptions::new().append(true).open(table) {
+                Ok(file) => {
+                    let mut write_line = String::new();
+                    let mut counter = 0;
+                    let mut writen_elements = 0;
+                    while counter < total_columns {
+                        if write_columns.contains(&counter) {
+                            if let Some(x) = &query.values {
+                                write_line.push_str(&x[writen_elements].to_string());
+                                writen_elements += 1;
+                            }
+                        }
+
+                        counter += 1;
+                        if counter < total_columns {
+                            write_line.push(',');
                         }
                     }
 
-                    counter += 1;
-                    if counter < total_columns {
-                        write_line.push(',');
-                    }
+                    write_line.push('\n');
+                    let _ = file.write(write_line.as_bytes());
                 }
-
-                write_line.push('\n');
-                let _ = file.write(write_line.as_bytes());
+                Err(_) => println!("ERROR en el programa"),
             }
-            Err(_) => println!("ERROR en el programa"),
         }
     }
 }
@@ -143,8 +145,8 @@ fn exec_query_select(query: Query) {
         Some(_) => exec_query_select_order_by(query),
         None => {
             let col_index = find_filter_column(&query);
-            let print_columns: Vec<usize> = find_print_columns(&query);
-            read_and_print_file(&query, col_index, &print_columns);
+//            let print_columns: Vec<usize> = find_print_columns(&query);
+            read_and_print_file(&query, col_index);
         }
     }
 }
@@ -153,30 +155,6 @@ fn find_total_columns(query: &Query) -> usize {
     match get_file_first_line(query) {
         Some(line) => line_to_vec(&line).len(),
         None => 0,
-    }
-}
-
-fn find_print_columns(query: &Query) -> Vec<usize> {
-    let mut result: Vec<usize> = Vec::new();
-    match &query.columns {
-        Some(cols) => match get_file_first_line(query) {
-            Some(line) => {
-                let table_columns: Vec<String> = line_to_vec(&line);
-                for element in cols {
-                    let mut counter = 0;
-                    while !table_columns[counter].eq(element) && counter < table_columns.len() {
-                        counter += 1;
-                    }
-                    if counter < table_columns.len() {
-                        result.push(counter);
-                    }
-                }
-
-                result
-            }
-            None => result,
-        },
-        None => result,
     }
 }
 
@@ -222,72 +200,77 @@ fn find_filter_column(query: &Query) -> i32 {
     col_index_filter
 }
 
-fn read_and_print_file(query: &Query, col_filter: i32, columns: &[usize]) {
+fn read_and_print_file(query: &Query, col_filter: i32) {
     if let Some(table) = &query.table {
         if let Ok(f) = File::open(table) {
-            let mut reader: BufReader<File> = BufReader::new(f);
-            let mut line = String::new();
 
-            let mut read = true;
-            while read {
-                if let Ok(x) = reader.read_line(&mut line) {
-                    line = line.replace('\n', "");
-                    read = x != 0;
-                    if read {
-                        let elements = line_to_vec(&line);
-                        match &query.where_condition {
-                            Some(condition) => {
-                                print_file_conditioned(columns, (col_filter, condition), &elements)
+                let mut reader: BufReader<File> = BufReader::new(f);
+                let mut line = String::new();
+    
+                let mut read = true;
+                while read {
+                    if let Ok(x) = reader.read_line(&mut line) {
+                        line = line.replace('\n', "");
+                        read = x != 0;
+                        if read {
+                            let elements = line_to_vec(&line);
+                            match &query.where_condition {
+                                Some(condition) => {
+                                    print_file_conditioned(&query.columns, (col_filter, condition), &elements)
+                                }
+                                None => print_file_unconditional(&query.columns, &elements),
                             }
-                            None => print_file_unconditional(columns, &elements),
+                            line.clear();
                         }
-                        line.clear();
                     }
-                }
-            }
+                }    
+
         }
     }
 }
 
-fn print_file_unconditional(columns: &[usize], elements: &[String]) {
+fn print_file_unconditional(columns_opt: &Option<Vec<usize>>, elements: &[String]) {
     // Pre: Columns vector sorted incremental && Elements of line content vector
     // Post: print to stdout the correct columns
 
-    if columns.is_empty() {
-        // SELECT * FROM
-        for (counter, element) in elements.iter().enumerate() {
-            if counter == 0 {
-                print!("{}", element);
-            } else {
-                print!(",{}", element);
+    match columns_opt {
+        Some(columns) => {
+            // SELECT columns FROM
+            let mut counter = 0;
+            while counter < elements.len() {
+                if columns.contains(&counter) {
+                    if counter == 0 {
+                        print!("{}", elements[counter]);
+                    } else {
+                        print!(",{}", elements[counter]);
+                    }
+                }
+
+                counter += 1;
             }
-        }
-    } else {
-        // SELECT columns FROM
-        let mut counter = 0;
-        while counter < elements.len() {
-            if columns.contains(&counter) {
+        },
+        None => {
+            for (counter, element) in elements.iter().enumerate() {
                 if counter == 0 {
-                    print!("{}", elements[counter]);
+                    print!("{}", element);
                 } else {
-                    print!(",{}", elements[counter]);
+                    print!(",{}", element);
                 }
             }
-
-            counter += 1;
         }
     }
+
     println!();
 }
 
-fn print_file_conditioned(columns: &[usize], filter: (i32, &Condition), elements: &[String]) {
+fn print_file_conditioned(columns_opt: &Option<Vec<usize>>, filter: (i32, &Condition), elements: &[String]) {
     let (col_filter, condition) = filter;
     if let Some(value) = &condition.value {
         if operate_condition(&elements[col_filter as usize], value, &condition.condition) {
-            print_file_unconditional(columns, elements)
+            print_file_unconditional(columns_opt, elements)
         }
     } else {
-        print_file_unconditional(columns, elements)
+        print_file_unconditional(columns_opt, elements)
     }
 }
 
@@ -372,3 +355,29 @@ fn exec_query_update(query: Query) {
         }
     }
 }
+
+/* 
+fn find_print_columns(query: &Query) -> Vec<usize> {
+    let mut result: Vec<usize> = Vec::new();
+    match &query.columns {
+        Some(cols) => match get_file_first_line(query) {
+            Some(line) => {
+                let table_columns: Vec<String> = line_to_vec(&line);
+                for element in cols {
+                    let mut counter = 0;
+                    while !table_columns[counter].eq(element) && counter < table_columns.len() {
+                        counter += 1;
+                    }
+                    if counter < table_columns.len() {
+                        result.push(counter);
+                    }
+                }
+
+                result
+            }
+            None => result,
+        },
+        None => result,
+    }
+}
+*/

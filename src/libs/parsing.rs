@@ -14,7 +14,7 @@ use super::error::SELECT_MAL_FORMATEADO;
 
 pub fn build_query(text_query: &String, path: &String) -> Result<Query, u32> {
     // Full "Compilation" process of query. Tokenization, sintactic analysis, semantic and build
-    let args = text_to_vec(text_query);
+    let args = text_to_vec(text_query, false);
     match vec_to_query(&args, path) {
         Ok(x) => validate_query(x),
         Err(x) => Err(x),
@@ -90,10 +90,10 @@ fn separate_args_insert(args: &[String], path: &String, result: &mut Query) -> R
     } else {
         result.table = Some(merge_table_and_path(path, &args[2]));
 
-        let mut columns: Vec<String> = Vec::new();
+        let mut string_columns: Vec<String> = Vec::new();
         let mut counter = 3;
         while counter < args.len() && !args[counter].eq("VALUES") {
-            columns.push(args[counter].to_string());
+            string_columns.push(args[counter].to_string());
             counter += 1;
         }
 
@@ -104,30 +104,40 @@ fn separate_args_insert(args: &[String], path: &String, result: &mut Query) -> R
             counter += 1;
         }
 
-        result.columns = Some(columns);
+        match get_columns_position(&result, &string_columns){
+            Ok(x) => result.columns = Some(x),
+            Err(x) => return Err(x)
+        }
         result.values = Some(values);
+
         Ok(0)
     }
 }
 
 fn separate_args_update(args: &[String], path: &String, result: &mut Query) -> Result<u32, u32> {
     if args.len() < UPDATE_MIN_LEN {
-        result.table = Some(merge_table_and_path(path, &args[1]));
+        match File::open(merge_table_and_path(path, &args[1])){
+            Ok(_) => result.table = Some(merge_table_and_path(path, &args[1])),
+            Err(_) => return Err(error::ARCHIVO_NO_PUDO_SER_ABIERTO)
+        }
 
-        let mut counter = 3;
-        let mut columns: Vec<String> = Vec::new();
+        let mut counter: usize = 3;
+        let mut string_columns: Vec<String> = Vec::new();
         let mut values: Vec<String> = Vec::new();
 
         while counter < args.len() && !args[counter].eq("WHERE") {
             if counter % 3 == 0 {
-                columns.push(args[counter].to_string());
+                string_columns.push(args[counter].to_string());
             } else if (counter % 3) == 2 {
                 values.push(args[counter].to_string());
             }
             counter += 1;
         }
 
-        result.columns = Some(columns);
+        match get_columns_position(&result, &string_columns){
+            Ok(x) => result.columns = Some(x),
+            Err(x) => return Err(x)
+        }
         result.values = Some(values);
 
         /* TODO: Code for complex conditions
@@ -147,19 +157,26 @@ fn separate_args_select(args: &[String], path: &String, result: &mut Query) -> R
     if args.len() < SELECT_MIN_LEN {
         Err(error::SELECT_MAL_FORMATEADO)
     } else {
-        let mut columns: Vec<String> = Vec::new();
+        let mut string_columns: Vec<String> = Vec::new();
         let mut counter = 1;
         while counter < args.len() && !args[counter].eq("FROM") {
-            columns.push(args[counter].to_string());
+            string_columns.push(args[counter].to_string());
             counter += 1;
         }
         counter += 1;
 
-        if !&columns[0].eq("*") {
-            result.columns = Some(columns);
+        match File::open(merge_table_and_path(path, &args[counter])){
+            Ok(_) => result.table = Some(merge_table_and_path(path, &args[counter])),
+            Err(_) => return Err(error::ARCHIVO_NO_PUDO_SER_ABIERTO)
         }
 
-        result.table = Some(merge_table_and_path(path, &args[counter]));
+        if !&string_columns[0].eq("*") {
+            match get_columns_position(&result, &string_columns){
+                Ok(x) => result.columns = Some(x),
+                Err(x) => return Err(x)
+            }
+        }
+        
         counter += 1;
 
         if counter == args.len() {
@@ -238,6 +255,41 @@ fn separate_args_select(args: &[String], path: &String, result: &mut Query) -> R
             Ok(0)
         }
     }
+}
+
+fn get_columns_position(query: &Query, string_cols: &Vec<String> ) -> Result<Vec<usize>,u32> {
+    // From string 
+    match get_file_first_line(query) {
+        Some(line) => {
+            let mut result: Vec<usize> = Vec::new();
+            let columns = text_to_vec(&line, true);
+            
+            let mut counter = 0;
+            while counter < string_cols.len() && columns.contains(&columns[counter]){
+                match find_column_position(&columns[counter], &columns){
+                    Ok(x) => {
+                        result.push(x);
+                        counter += 1;
+                    },
+                    Err(x) => return Err(x)
+                }
+            }
+            Ok(result)
+        },
+        None => return Err(error::ARCHIVO_NO_PUDO_SER_ABIERTO)
+    }
+}
+
+fn find_column_position(column_name: &String ,columns: &Vec<String>) -> Result<usize,u32> {
+    let mut counter = 0;
+    while counter < columns.len() {
+        if column_name.eq(&columns[counter]) {
+            return Ok(counter)
+        } else{
+            counter += 1;
+        }
+    }
+    Err(error::ARCHIVO_NO_CONTIENE_COLUMNAS_SOLICITADAS)
 }
 
 fn check_operation_format(args: &Vec<String>) -> Result<QueryType, u32> {
@@ -435,11 +487,38 @@ fn get_where_columns(query: &Query) -> Option<String> {
     }
 }
 
-fn text_to_vec(text_query: &String) -> Vec<String> {
+pub fn get_file_first_line(query: &Query) -> Option<String> {
+    // Pre: query 
+    // Post: File first line, if any
+    match &query.table {
+        Some(table) => match File::open(table) {
+            Ok(f) => {
+                let mut reader: BufReader<File> = BufReader::new(f);
+                let mut line = String::new();
+
+                match reader.read_line(&mut line) {
+                    Ok(_) => {
+                        line = line.replace('\n', "");
+                        Some(line)
+                    }
+                    Err(_) => None,
+                }
+            }
+            Err(_) => None,
+        },
+        None => None,
+    }
+}
+
+fn text_to_vec(text_query: &String, coma: bool) -> Vec<String> {
     // Text to vector. Tokenization by space, new line & coma
     let mut tmp_text_query = text_query.to_string();
     tmp_text_query = tmp_text_query.replace('\n', " ");
-    tmp_text_query = tmp_text_query.replace(',', "");
+    if (!coma){
+        tmp_text_query = tmp_text_query.replace(',', "");
+    } else {
+        tmp_text_query = tmp_text_query.replace(',', " ");
+    }
     tmp_text_query = tmp_text_query.replace(';', "");
     let mut split = tmp_text_query.split(' ');
 
@@ -459,7 +538,8 @@ fn text_to_vec(text_query: &String) -> Vec<String> {
 }
 
 fn vec_to_query(args: &Vec<String>, path: &String) -> Result<Query, u32> {
-    // Vec to non validated query
+    // Pre:  Vec of queries tokens & path to tables
+    // Post: Vec to non validated query 
     let mut result: Query = build_empty_query();
     match check_operation_format(args) {
         Ok(x) => match &x {
@@ -486,34 +566,13 @@ fn vec_to_query(args: &Vec<String>, path: &String) -> Result<Query, u32> {
     Ok(result)
 }
 
-pub fn get_file_first_line(query: &Query) -> Option<String> {
-    match &query.table {
-        Some(table) => match File::open(table) {
-            Ok(f) => {
-                let mut reader: BufReader<File> = BufReader::new(f);
-                let mut line = String::new();
-
-                match reader.read_line(&mut line) {
-                    Ok(_) => {
-                        line = line.replace('\n', "");
-                        Some(line)
-                    }
-                    Err(_) => None,
-                }
-            }
-            Err(_) => None,
-        },
-        None => None,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_text_to_vec1() {
-        let rt1 = text_to_vec(&String::from("SELECT * FROM table"));
+        let rt1 = text_to_vec(&String::from("SELECT * FROM table"), false);
         assert_eq!(rt1, vec!["SELECT", "*", "FROM", "table"]);
     }
 
@@ -521,7 +580,7 @@ mod tests {
     fn test_text_to_vec2() {
         let rt2 = text_to_vec(&String::from(
             "SELECT id, producto, id_cliente\nFROM ordenes\nWHERE cantidad > 1",
-        ));
+        ), false);
         assert_eq!(
             rt2,
             vec![
@@ -539,62 +598,3 @@ mod tests {
         );
     }
 }
-
-/*
-fn check_where_format(args: &Vec<String>, start_position: usize) -> bool {
-    let mut result = true;
-
-    let mut counter: usize   = start_position;
-
-    let mut not_detected: bool = false;
-    let mut op_detected: bool = false;
-
-    while counter < args.len() && result {
-        if args[counter].eq("NOT") {
-            if not_detected || op_detected {
-                result = false;  // NOT NOT. Que estas haciendo ?
-            } else {
-                not_detected = true;
-                counter += 1;
-            }
-        } else if args[counter].eq("AND") || args[counter].eq("OR")  {
-            if op_detected {
-                result = false;  // AND OR , OR AND, OR OR, AND AND. Que estas haciendo ?
-            } else {
-                op_detected = true;
-                counter += 1;
-            }
-        } else if counter + 3 > args.len() {
-            result = false;
-        } else {
-
-        }
-    }
-
-    result
-}
-
-fn check_table_exist(path: &String, args: &Vec<String>, operation: &QueryType) -> Result<String, u32>{
-    // Asume query bien formateado
-    let mut table= String::from(path);
-    table.push('/');
-    match &operation {
-        QueryType::DELETE => table.push_str(&args[2]),
-        QueryType::INSERT => table.push_str(&args[2]),
-        QueryType::SELECT => {
-            // Debo encontrar cual es la tabla (asumiendo query bien formateado)
-            let mut counter = 2;
-            while ! args[counter].eq("FROM"){
-                counter += 1;
-            }
-            table.push_str(&args[counter + 1])
-        },
-        QueryType::UPDATE => table.push_str(&args[1]),
-    }
-
-    match File::open(&table) { // TODO: Path::exist()?
-        Ok(_) => return Ok(table),
-        Err(_) => return Err(error::ARCHIVO_NO_PUDO_SER_ABIERTO)
-    }
-}
-*/
