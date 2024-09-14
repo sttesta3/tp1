@@ -110,7 +110,7 @@ fn exec_query_insert(query: Query) {
     if let Some(table) = &query.table {
         if let Some(write_columns) = &query.columns {
             let total_columns = find_total_columns(&query);
-//        let write_columns = find_print_columns(&query);
+            //        let write_columns = find_print_columns(&query);
 
             match &mut OpenOptions::new().append(true).open(table) {
                 Ok(file) => {
@@ -145,7 +145,7 @@ fn exec_query_select(query: Query) {
         Some(_) => exec_query_select_order_by(query),
         None => {
             let col_index = find_filter_column(&query);
-//            let print_columns: Vec<usize> = find_print_columns(&query);
+            //            let print_columns: Vec<usize> = find_print_columns(&query);
             read_and_print_file(&query, col_index);
         }
     }
@@ -203,28 +203,28 @@ fn find_filter_column(query: &Query) -> i32 {
 fn read_and_print_file(query: &Query, col_filter: i32) {
     if let Some(table) = &query.table {
         if let Ok(f) = File::open(table) {
+            let mut reader: BufReader<File> = BufReader::new(f);
+            let mut line = String::new();
 
-                let mut reader: BufReader<File> = BufReader::new(f);
-                let mut line = String::new();
-    
-                let mut read = true;
-                while read {
-                    if let Ok(x) = reader.read_line(&mut line) {
-                        line = line.replace('\n', "");
-                        read = x != 0;
-                        if read {
-                            let elements = line_to_vec(&line);
-                            match &query.where_condition {
-                                Some(condition) => {
-                                    print_file_conditioned(&query.columns, (col_filter, condition), &elements)
-                                }
-                                None => print_file_unconditional(&query.columns, &elements),
-                            }
-                            line.clear();
+            let mut read = true;
+            while read {
+                if let Ok(x) = reader.read_line(&mut line) {
+                    line = line.replace('\n', "");
+                    read = x != 0;
+                    if read {
+                        let elements = line_to_vec(&line);
+                        match &query.where_condition {
+                            Some(condition) => print_file_conditioned(
+                                &query.columns,
+                                (col_filter, condition),
+                                &elements,
+                            ),
+                            None => print_file_unconditional(&query.columns, &elements),
                         }
+                        line.clear();
                     }
-                }    
-
+                }
+            }
         }
     }
 }
@@ -248,7 +248,7 @@ fn print_file_unconditional(columns_opt: &Option<Vec<usize>>, elements: &[String
 
                 counter += 1;
             }
-        },
+        }
         None => {
             for (counter, element) in elements.iter().enumerate() {
                 if counter == 0 {
@@ -263,7 +263,11 @@ fn print_file_unconditional(columns_opt: &Option<Vec<usize>>, elements: &[String
     println!();
 }
 
-fn print_file_conditioned(columns_opt: &Option<Vec<usize>>, filter: (i32, &Condition), elements: &[String]) {
+fn print_file_conditioned(
+    columns_opt: &Option<Vec<usize>>,
+    filter: (i32, &Condition),
+    elements: &[String],
+) {
     let (col_filter, condition) = filter;
     if let Some(value) = &condition.value {
         if operate_condition(&elements[col_filter as usize], value, &condition.condition) {
@@ -322,7 +326,8 @@ fn exec_query_update(query: Query) {
                                                     &elements[col_index as usize],
                                                     value,
                                                     &cond.condition,
-                                                ) { // Line not updated
+                                                ) {
+                                                    // Line not updated
                                                     line.push('\n');
                                                     if let Err(_error) =
                                                         tmp_file.write(line.as_bytes())
@@ -330,10 +335,12 @@ fn exec_query_update(query: Query) {
                                                         read = false;
                                                         valid_operation = false;
                                                     }
-                                                } else { // Update Line
-                                                    if let Err(_error) =
-                                                        tmp_file.write(update_line(&elements, columns, values).as_bytes())
-                                                    {
+                                                } else {
+                                                    // Update Line
+                                                    if let Err(_error) = tmp_file.write(
+                                                        update_line(&elements, columns, values)
+                                                            .as_bytes(),
+                                                    ) {
                                                         read = false;
                                                         valid_operation = false;
                                                     }
@@ -368,11 +375,11 @@ fn update_line(elements: &[String], columns: &[usize], values: &[String]) -> Str
         if counter > 0 {
             result.push(',');
         }
-        if columns.contains(&counter){
-            result.push_str(&values[writen_counter].to_string());    
-            writen_counter += 1;        
+        if columns.contains(&counter) {
+            result.push_str(&values[writen_counter].to_string());
+            writen_counter += 1;
         } else {
-            result.push_str(&element.to_string());            
+            result.push_str(&element.to_string());
         }
     }
     result

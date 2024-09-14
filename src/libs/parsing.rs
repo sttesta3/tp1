@@ -34,9 +34,9 @@ fn separate_args_delete(args: &[String], path: &String, result: &mut Query) -> R
     if args.len() < DELETE_MIN_LEN {
         Err(error::DELETE_MAL_FORMATEADO)
     } else {
-        match File::open(merge_table_and_path(path, &args[2])){
+        match File::open(merge_table_and_path(path, &args[2])) {
             Ok(_) => result.table = Some(merge_table_and_path(path, &args[2])),
-            Err(_) => return Err(error::ARCHIVO_NO_PUDO_SER_ABIERTO)
+            Err(_) => return Err(error::ARCHIVO_NO_PUDO_SER_ABIERTO),
         }
 
         if args.len() != DELETE_MIN_LEN {
@@ -91,9 +91,9 @@ fn separate_args_insert(args: &[String], path: &String, result: &mut Query) -> R
     if args.len() < INSERT_MIN_LEN {
         Err(error::INSERT_MAL_FORMATEADO)
     } else {
-        match File::open(merge_table_and_path(path, &args[2])){
+        match File::open(merge_table_and_path(path, &args[2])) {
             Ok(_) => result.table = Some(merge_table_and_path(path, &args[2])),
-            Err(_) => return Err(error::ARCHIVO_NO_PUDO_SER_ABIERTO)
+            Err(_) => return Err(error::ARCHIVO_NO_PUDO_SER_ABIERTO),
         }
 
         let mut string_columns: Vec<String> = Vec::new();
@@ -110,9 +110,9 @@ fn separate_args_insert(args: &[String], path: &String, result: &mut Query) -> R
             counter += 1;
         }
 
-        match get_columns_position(&result, &string_columns){
+        match get_columns_position(&result, &string_columns) {
             Ok(x) => result.columns = Some(x),
-            Err(x) => return Err(x)
+            Err(x) => return Err(x),
         }
         result.values = Some(values);
 
@@ -124,9 +124,9 @@ fn separate_args_update(args: &[String], path: &String, result: &mut Query) -> R
     if args.len() < UPDATE_MIN_LEN {
         Err(error::UPDATE_MAL_FORMATEADO)
     } else {
-        match File::open(merge_table_and_path(path, &args[1])){
+        match File::open(merge_table_and_path(path, &args[1])) {
             Ok(_) => result.table = Some(merge_table_and_path(path, &args[1])),
-            Err(_) => return Err(error::ARCHIVO_NO_PUDO_SER_ABIERTO)
+            Err(_) => return Err(error::ARCHIVO_NO_PUDO_SER_ABIERTO),
         }
 
         let mut counter: usize = 3;
@@ -142,9 +142,9 @@ fn separate_args_update(args: &[String], path: &String, result: &mut Query) -> R
             counter += 1;
         }
 
-        match get_columns_position(&result, &string_columns){
+        match get_columns_position(&result, &string_columns) {
             Ok(x) => result.columns = Some(x),
-            Err(x) => return Err(x)
+            Err(x) => return Err(x),
         }
         result.values = Some(values);
 
@@ -189,9 +189,8 @@ fn separate_args_update(args: &[String], path: &String, result: &mut Query) -> R
             return Err(error::WHERE_MAL_FORMATEADO);
         }
 
-
         Ok(0)
-    } 
+    }
 }
 
 fn separate_args_select(args: &[String], path: &String, result: &mut Query) -> Result<u32, u32> {
@@ -206,18 +205,18 @@ fn separate_args_select(args: &[String], path: &String, result: &mut Query) -> R
         }
         counter += 1;
 
-        match File::open(merge_table_and_path(path, &args[counter])){
+        match File::open(merge_table_and_path(path, &args[counter])) {
             Ok(_) => result.table = Some(merge_table_and_path(path, &args[counter])),
-            Err(_) => return Err(error::ARCHIVO_NO_PUDO_SER_ABIERTO)
+            Err(_) => return Err(error::ARCHIVO_NO_PUDO_SER_ABIERTO),
         }
 
         if !&string_columns[0].eq("*") {
-            match get_columns_position(&result, &string_columns){
+            match get_columns_position(&result, &string_columns) {
                 Ok(x) => result.columns = Some(x),
-                Err(x) => return Err(x)
+                Err(x) => return Err(x),
             }
         }
-        
+
         counter += 1;
 
         if counter == args.len() {
@@ -298,40 +297,39 @@ fn separate_args_select(args: &[String], path: &String, result: &mut Query) -> R
     }
 }
 
-fn get_columns_position(query: &Query, string_cols: &Vec<String> ) -> Result<Vec<usize>,u32> {
-    // From string 
+fn get_columns_position(query: &Query, string_cols: &Vec<String>) -> Result<Vec<usize>, u32> {
+    // From string
     match get_file_first_line(query) {
         Some(line) => {
             let mut result: Vec<usize> = Vec::new();
             let columns = text_to_vec(&line, true);
-            
+
             let mut counter = 0;
             while counter < string_cols.len() {
                 if columns.contains(&string_cols[counter]) {
-                    match find_column_position(&string_cols[counter], &columns){
+                    match find_column_position(&string_cols[counter], &columns) {
                         Ok(x) => {
                             result.push(x);
                             counter += 1;
-                        },
-                        Err(x) => return Err(x)
-                    }    
-                }
-                else {
-                    return Err(error::ARCHIVO_NO_CONTIENE_COLUMNAS_SOLICITADAS)
+                        }
+                        Err(x) => return Err(x),
+                    }
+                } else {
+                    return Err(error::ARCHIVO_NO_CONTIENE_COLUMNAS_SOLICITADAS);
                 }
             }
             Ok(result)
-        },
-        None => return Err(error::ARCHIVO_NO_PUDO_SER_ABIERTO)
+        }
+        None => return Err(error::ARCHIVO_NO_PUDO_SER_ABIERTO),
     }
 }
 
-fn find_column_position(column_name: &String ,columns: &Vec<String>) -> Result<usize,u32> {
+fn find_column_position(column_name: &String, columns: &Vec<String>) -> Result<usize, u32> {
     let mut counter = 0;
     while counter < columns.len() {
         if column_name.eq(&columns[counter]) {
-            return Ok(counter)
-        } else{
+            return Ok(counter);
+        } else {
             counter += 1;
         }
     }
@@ -534,7 +532,7 @@ fn get_where_columns(query: &Query) -> Option<String> {
 }
 
 pub fn get_file_first_line(query: &Query) -> Option<String> {
-    // Pre: query 
+    // Pre: query
     // Post: File first line, if any
     match &query.table {
         Some(table) => match File::open(table) {
@@ -585,7 +583,7 @@ fn text_to_vec(text_query: &String, coma: bool) -> Vec<String> {
 
 fn vec_to_query(args: &Vec<String>, path: &String) -> Result<Query, u32> {
     // Pre:  Vec of queries tokens & path to tables
-    // Post: Vec to non validated query 
+    // Post: Vec to non validated query
     let mut result: Query = build_empty_query();
     match check_operation_format(args) {
         Ok(x) => match &x {
@@ -624,9 +622,10 @@ mod tests {
 
     #[test]
     fn test_text_to_vec2() {
-        let rt2 = text_to_vec(&String::from(
-            "SELECT id, producto, id_cliente\nFROM ordenes\nWHERE cantidad > 1",
-        ), false);
+        let rt2 = text_to_vec(
+            &String::from("SELECT id, producto, id_cliente\nFROM ordenes\nWHERE cantidad > 1"),
+            false,
+        );
         assert_eq!(
             rt2,
             vec![
