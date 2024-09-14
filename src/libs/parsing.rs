@@ -92,7 +92,7 @@ fn separate_args_insert(args: &[String], path: &String, result: &mut Query) -> R
 
         let mut columns: Vec<String> = Vec::new();
         let mut counter = 3;
-        while counter < args.len()  && !args[counter].eq("VALUES") {
+        while counter < args.len() && !args[counter].eq("VALUES") {
             columns.push(args[counter].to_string());
             counter += 1;
         }

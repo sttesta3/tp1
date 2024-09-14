@@ -22,7 +22,7 @@ pub fn build_condition(column: String, value: String, cond: ConditionOperator) -
     }
 }
 
-pub fn operate_condition(v1: &String, v2: &String, operator: &ConditionOperator ) -> bool {
+pub fn operate_condition(v1: &String, v2: &String, operator: &ConditionOperator) -> bool {
     if let Ok(x1) = v1.parse::<i32>() {
         if let Ok(x2) = v2.parse::<i32>() {
             match operator {
@@ -32,7 +32,7 @@ pub fn operate_condition(v1: &String, v2: &String, operator: &ConditionOperator 
                 ConditionOperator::Higher => return x1 > x2,
                 ConditionOperator::HigherEqual => return x1 >= x2,
             }
-        };    
+        };
     };
 
     match operator {
@@ -43,4 +43,3 @@ pub fn operate_condition(v1: &String, v2: &String, operator: &ConditionOperator 
         ConditionOperator::HigherEqual => true,
     }
 }
-
