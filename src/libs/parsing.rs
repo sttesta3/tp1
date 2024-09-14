@@ -34,7 +34,10 @@ fn separate_args_delete(args: &[String], path: &String, result: &mut Query) -> R
     if args.len() < DELETE_MIN_LEN {
         Err(error::DELETE_MAL_FORMATEADO)
     } else {
-        result.table = Some(merge_table_and_path(path, &args[2]));
+        match File::open(merge_table_and_path(path, &args[2])){
+            Ok(_) => result.table = Some(merge_table_and_path(path, &args[2])),
+            Err(_) => return Err(error::ARCHIVO_NO_PUDO_SER_ABIERTO)
+        }
 
         if args.len() != DELETE_MIN_LEN {
             return Err(error::DELETE_MAL_FORMATEADO);
@@ -88,7 +91,10 @@ fn separate_args_insert(args: &[String], path: &String, result: &mut Query) -> R
     if args.len() < INSERT_MIN_LEN {
         Err(error::INSERT_MAL_FORMATEADO)
     } else {
-        result.table = Some(merge_table_and_path(path, &args[2]));
+        match File::open(merge_table_and_path(path, &args[2])){
+            Ok(_) => result.table = Some(merge_table_and_path(path, &args[2])),
+            Err(_) => return Err(error::ARCHIVO_NO_PUDO_SER_ABIERTO)
+        }
 
         let mut string_columns: Vec<String> = Vec::new();
         let mut counter = 3;
@@ -116,6 +122,8 @@ fn separate_args_insert(args: &[String], path: &String, result: &mut Query) -> R
 
 fn separate_args_update(args: &[String], path: &String, result: &mut Query) -> Result<u32, u32> {
     if args.len() < UPDATE_MIN_LEN {
+        Err(error::UPDATE_MAL_FORMATEADO)
+    } else {
         match File::open(merge_table_and_path(path, &args[1])){
             Ok(_) => result.table = Some(merge_table_and_path(path, &args[1])),
             Err(_) => return Err(error::ARCHIVO_NO_PUDO_SER_ABIERTO)
@@ -147,10 +155,43 @@ fn separate_args_update(args: &[String], path: &String, result: &mut Query) -> R
             Err(x) => return Err(x)
         }
         */
+        if args[8].eq("<") {
+            result.where_condition = Some(build_condition(
+                args[7].to_string(),
+                args[9].to_string(),
+                ConditionOperator::Minor,
+            ))
+        } else if args[8].eq("<=") {
+            result.where_condition = Some(build_condition(
+                args[7].to_string(),
+                args[9].to_string(),
+                ConditionOperator::MinorEqual,
+            ))
+        } else if args[8].eq("=") {
+            result.where_condition = Some(build_condition(
+                args[7].to_string(),
+                args[9].to_string(),
+                ConditionOperator::Equal,
+            ))
+        } else if args[8].eq(">=") {
+            result.where_condition = Some(build_condition(
+                args[7].to_string(),
+                args[9].to_string(),
+                ConditionOperator::HigherEqual,
+            ))
+        } else if args[8].eq(">") {
+            result.where_condition = Some(build_condition(
+                args[7].to_string(),
+                args[9].to_string(),
+                ConditionOperator::Higher,
+            ))
+        } else {
+            return Err(error::WHERE_MAL_FORMATEADO);
+        }
+
+
         Ok(0)
-    } else {
-        Err(error::UPDATE_MAL_FORMATEADO)
-    }
+    } 
 }
 
 fn separate_args_select(args: &[String], path: &String, result: &mut Query) -> Result<u32, u32> {
@@ -265,13 +306,18 @@ fn get_columns_position(query: &Query, string_cols: &Vec<String> ) -> Result<Vec
             let columns = text_to_vec(&line, true);
             
             let mut counter = 0;
-            while counter < string_cols.len() && columns.contains(&columns[counter]){
-                match find_column_position(&columns[counter], &columns){
-                    Ok(x) => {
-                        result.push(x);
-                        counter += 1;
-                    },
-                    Err(x) => return Err(x)
+            while counter < string_cols.len() {
+                if columns.contains(&string_cols[counter]) {
+                    match find_column_position(&string_cols[counter], &columns){
+                        Ok(x) => {
+                            result.push(x);
+                            counter += 1;
+                        },
+                        Err(x) => return Err(x)
+                    }    
+                }
+                else {
+                    return Err(error::ARCHIVO_NO_CONTIENE_COLUMNAS_SOLICITADAS)
                 }
             }
             Ok(result)
@@ -514,7 +560,7 @@ fn text_to_vec(text_query: &String, coma: bool) -> Vec<String> {
     // Text to vector. Tokenization by space, new line & coma
     let mut tmp_text_query = text_query.to_string();
     tmp_text_query = tmp_text_query.replace('\n', " ");
-    if (!coma){
+    if !coma {
         tmp_text_query = tmp_text_query.replace(',', "");
     } else {
         tmp_text_query = tmp_text_query.replace(',', " ");

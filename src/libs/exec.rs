@@ -314,16 +314,15 @@ fn exec_query_update(query: Query) {
                                     let mut read = true;
                                     while read {
                                         if let Ok(x) = reader.read_line(&mut line) {
-                                            line = line.replace('\n', "");
                                             read = x != 0;
                                             if read {
+                                                line = line.replace('\n', "");
                                                 let elements = line_to_vec(&line);
                                                 if !operate_condition(
                                                     &elements[col_index as usize],
                                                     value,
                                                     &cond.condition,
-                                                ) {
-                                                    // Line not updated
+                                                ) { // Line not updated
                                                     line.push('\n');
                                                     if let Err(_error) =
                                                         tmp_file.write(line.as_bytes())
@@ -331,7 +330,13 @@ fn exec_query_update(query: Query) {
                                                         read = false;
                                                         valid_operation = false;
                                                     }
-                                                } else { // Updated Line
+                                                } else { // Update Line
+                                                    if let Err(_error) =
+                                                        tmp_file.write(update_line(&elements, columns, values).as_bytes())
+                                                    {
+                                                        read = false;
+                                                        valid_operation = false;
+                                                    }
                                                 }
                                             }
                                             line.clear();
@@ -356,28 +361,19 @@ fn exec_query_update(query: Query) {
     }
 }
 
-/* 
-fn find_print_columns(query: &Query) -> Vec<usize> {
-    let mut result: Vec<usize> = Vec::new();
-    match &query.columns {
-        Some(cols) => match get_file_first_line(query) {
-            Some(line) => {
-                let table_columns: Vec<String> = line_to_vec(&line);
-                for element in cols {
-                    let mut counter = 0;
-                    while !table_columns[counter].eq(element) && counter < table_columns.len() {
-                        counter += 1;
-                    }
-                    if counter < table_columns.len() {
-                        result.push(counter);
-                    }
-                }
-
-                result
-            }
-            None => result,
-        },
-        None => result,
+fn update_line(elements: &[String], columns: &[usize], values: &[String]) -> String {
+    let mut result = String::new();
+    let mut writen_counter = 0;
+    for (counter, element) in elements.iter().enumerate() {
+        if counter > 0 {
+            result.push(',');
+        }
+        if columns.contains(&counter){
+            result.push_str(&values[writen_counter].to_string());    
+            writen_counter += 1;        
+        } else {
+            result.push_str(&element.to_string());            
+        }
     }
+    result
 }
-*/
