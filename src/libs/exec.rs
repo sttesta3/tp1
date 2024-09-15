@@ -64,7 +64,7 @@ fn exec_query_delete(query: Query) {
                     Err(_) => valid_operation = false,
                 }
 
-                if let Err(_) = remove_old_file(table, &tmp_file_name, valid_operation) {
+                if remove_old_file(table, &tmp_file_name, valid_operation).is_err() {
                     println!("Error en manipulación de archivos");
                 }
             }
@@ -74,8 +74,10 @@ fn exec_query_delete(query: Query) {
 
 fn remove_old_file(file: &String, tmp_file: &String, valid_operation: bool) -> Result<u32, u32> {
     if valid_operation {
-        if let Ok(_) = remove_file(file) {
-            let _ = rename(tmp_file, file);
+        if remove_file(file).is_ok() {
+            if rename(tmp_file, file).is_err() {
+                return Err(3);
+            }
             Ok(0)
         } else {
             let _ = remove_file(tmp_file);
@@ -87,7 +89,7 @@ fn remove_old_file(file: &String, tmp_file: &String, valid_operation: bool) -> R
     }
 }
 
-fn get_tmp_file_name(table: &String) -> String {
+fn get_tmp_file_name(table: &str) -> String {
     // Pre: Path and name to file. ruta/a/tablas/tabla.csv
     // Post: same file but starting with period, as long as it's a hidden file
     let mut output = String::new();
@@ -97,7 +99,7 @@ fn get_tmp_file_name(table: &String) -> String {
             output.push('.');
         }
 
-        output.push_str(&element.to_string());
+        output.push_str(element);
 
         if counter < last_item_index {
             output.push('/');
@@ -358,7 +360,7 @@ fn exec_query_update(query: Query) {
                             Err(_) => valid_operation = false,
                         }
 
-                        if let Err(_) = remove_old_file(table, &tmp_file, valid_operation) {
+                        if remove_old_file(table, &tmp_file, valid_operation).is_err() {
                             println!("Error en manipulación de archivos");
                         }
                     }

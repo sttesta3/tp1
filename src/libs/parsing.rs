@@ -110,7 +110,7 @@ fn separate_args_insert(args: &[String], path: &String, result: &mut Query) -> R
             counter += 1;
         }
 
-        match get_columns_position(&result, &string_columns) {
+        match get_columns_position(result, &string_columns) {
             Ok(x) => result.columns = Some(x),
             Err(x) => return Err(x),
         }
@@ -142,7 +142,7 @@ fn separate_args_update(args: &[String], path: &String, result: &mut Query) -> R
             counter += 1;
         }
 
-        match get_columns_position(&result, &string_columns) {
+        match get_columns_position(result, &string_columns) {
             Ok(x) => result.columns = Some(x),
             Err(x) => return Err(x),
         }
@@ -211,7 +211,7 @@ fn separate_args_select(args: &[String], path: &String, result: &mut Query) -> R
         }
 
         if !&string_columns[0].eq("*") {
-            match get_columns_position(&result, &string_columns) {
+            match get_columns_position(result, &string_columns) {
                 Ok(x) => result.columns = Some(x),
                 Err(x) => return Err(x),
             }
@@ -297,7 +297,7 @@ fn separate_args_select(args: &[String], path: &String, result: &mut Query) -> R
     }
 }
 
-fn get_columns_position(query: &Query, string_cols: &Vec<String>) -> Result<Vec<usize>, u32> {
+fn get_columns_position(query: &Query, string_cols: &[String]) -> Result<Vec<usize>, u32> {
     // From string
     match get_file_first_line(query) {
         Some(line) => {
@@ -320,11 +320,11 @@ fn get_columns_position(query: &Query, string_cols: &Vec<String>) -> Result<Vec<
             }
             Ok(result)
         }
-        None => return Err(error::ARCHIVO_NO_PUDO_SER_ABIERTO),
+        None => Err(error::ARCHIVO_NO_PUDO_SER_ABIERTO),
     }
 }
 
-fn find_column_position(column_name: &String, columns: &Vec<String>) -> Result<usize, u32> {
+fn find_column_position(column_name: &String, columns: &[String]) -> Result<usize, u32> {
     let mut counter = 0;
     while counter < columns.len() {
         if column_name.eq(&columns[counter]) {
@@ -336,7 +336,7 @@ fn find_column_position(column_name: &String, columns: &Vec<String>) -> Result<u
     Err(error::ARCHIVO_NO_CONTIENE_COLUMNAS_SOLICITADAS)
 }
 
-fn check_operation_format(args: &Vec<String>) -> Result<QueryType, u32> {
+fn check_operation_format(args: &[String]) -> Result<QueryType, u32> {
     // Check correct operation sintaxis
     let operation = &args[0];
     if operation.eq("DELETE") {
@@ -523,10 +523,7 @@ fn check_columns_contains_condition(columns: Vec<String>, query: Query) -> Resul
 
 fn get_where_columns(query: &Query) -> Option<String> {
     match &query.where_condition {
-        Some(cond) => match &cond.column {
-            Some(col) => Some(col.to_string()),
-            None => None,
-        },
+        Some(cond) => cond.column.as_ref().map(|col| col.to_string()),
         None => None,
     }
 }
@@ -581,7 +578,7 @@ fn text_to_vec(text_query: &String, coma: bool) -> Vec<String> {
     result
 }
 
-fn vec_to_query(args: &Vec<String>, path: &String) -> Result<Query, u32> {
+fn vec_to_query(args: &[String], path: &String) -> Result<Query, u32> {
     // Pre:  Vec of queries tokens & path to tables
     // Post: Vec to non validated query
     let mut result: Query = build_empty_query();
