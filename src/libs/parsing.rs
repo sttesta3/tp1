@@ -551,7 +551,7 @@ pub fn get_file_first_line(query: &Query) -> Option<String> {
     }
 }
 
-fn text_to_vec(text_query: &String, coma: bool) -> Vec<String> {
+pub fn text_to_vec(text_query: &String, coma: bool) -> Vec<String> {
     // Text to vector. Tokenization by space, new line & coma
     let mut tmp_text_query = text_query.to_string();
     tmp_text_query = tmp_text_query.replace('\n', " ");
