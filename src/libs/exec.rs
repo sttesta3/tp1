@@ -1,12 +1,14 @@
+use std::collections::btree_map::Range;
 use std::fmt::format;
 use std::fs::{remove_file, rename, File, OpenOptions};
 use std::io::{BufRead, BufReader, Seek, Write};
 
-use crate::condition::{operate_condition, Condition};
+use crate::condition::{self, operate_condition, Condition};
 //use crate::condition::operate_condition;
 use crate::query::query_type::QueryType;
-use crate::query::Query;
+use crate::query::{self, Query};
 
+use super::error;
 use super::parsing::{self, get_file_first_line, text_to_vec};
 
 static FILE_SORT_BUFFER: usize = 20;
@@ -109,6 +111,7 @@ fn exec_query_insert(query: Query) {
     }
 }
 
+/* 
 fn exec_query_select(query: Query) {
     match &query.order_by {
         Some((column, asc)) => {
@@ -127,6 +130,25 @@ fn exec_query_select(query: Query) {
         }
     }
 }
+*/
+
+fn exec_query_select(query: Query) {
+    match &query.order_by {
+        Some((column, asc)) => {
+            print_header(&query);
+            let col_index: i32 = find_filter_column(&query);
+            
+            if let Ok(mut files) = read_into_sorted_files(&query, col_index as usize, &asc) {
+
+            }
+        }
+        None => {
+            let col_index: i32 = find_filter_column(&query);
+            read_and_print_file(&query, col_index);
+        }
+    }
+}
+
 
 fn sort_and_print_file(
     column_number: usize,
@@ -157,7 +179,7 @@ fn sort_and_print_file(
                             line = line.replace('\n', "");
                             read = x != 0;
 
-                            let element = text_to_vec(line, true);
+                            let element = text_to_vec(&line, true);
                             if counter < FILE_SORT_BUFFER {
                                 actually_sorting_elements.insert(
                                     find_sorted_position(
@@ -414,6 +436,42 @@ fn find_column(query: &Query, column: &String) -> Option<usize> {
     }
 }
 
+fn print_header(query: &Query) {
+    if let Some(table) = &query.table {
+        if let Ok(file) = File::open(table) {
+            let mut reader: BufReader<File> = BufReader::new(file);
+            let mut line = String::new();
+
+            if let Ok(x) = reader.read_line(&mut line) {
+                if x > 0 {
+                    match &query.columns {
+                        Some(columns) => {
+                            line = line.replace('\n', "");
+                            let args = text_to_vec(&line, true);
+                            let mut counter = 0;
+                            let mut first = true;
+                            for arg in args {
+                                if columns.contains(&counter) {
+                                    if first {
+                                        print!("{}",arg);
+                                        first = false;
+                                    } else{
+                                        print!(",{}",arg);
+                                    }
+    
+                                }
+                                counter += 1
+                            }
+                            println!();
+                        },
+                        None => println!("{}",line)
+                    }    
+                }
+            }
+        }
+    }
+}
+
 fn read_and_print_file(query: &Query, col_filter: i32) {
     if let Some(table) = &query.table {
         if let Ok(f) = File::open(table) {
@@ -441,6 +499,124 @@ fn read_and_print_file(query: &Query, col_filter: i32) {
             }
         }
     }
+}
+
+fn read_into_sorted_files(query: &Query, col_index: usize, asc: &bool) -> Result<Vec<File>,u32> {
+    // Pre:  Query, the col index for sorting and bool of ascending/descending
+    // Post: Vec of tmp_files 
+    match &query.table {
+        None => Err(3),
+        Some(table) => {
+            let tmp_file_name = get_tmp_file_name(table);
+            match File::open(table) {
+                Err(_) => return Err(3),
+                Ok(table_file) => {
+                    let mut tmp_files: Vec<File> = Vec::new();
+                    let mut lines_buffer: Vec<Vec<String>> = Vec::new();
+
+                    let mut reader: BufReader<File> = BufReader::new(table_file);
+                    let mut line = String::new();
+    
+                    let mut read :bool = true;
+                    let mut valid_operation :bool = true;
+                    if reader.read_line(&mut line).is_ok() {
+                        line.clear();
+                        while read {
+                            match reader.read_line(&mut line) {
+                                Err(_) => {
+                                    read = false;
+                                    valid_operation = false;
+                                },
+                                Ok(x) => {
+                                    line = line.replace('\n', "");
+                                    read = x != 0;
+                                    if read {
+                                        let elements = text_to_vec(&line, true);
+                                        match &query.where_condition {
+                                            Some(condition) => insert_conditioned(&elements,&mut lines_buffer,col_index,condition, asc),
+                                            None => insert_unconditioned(elements, &query.columns, &mut lines_buffer, &col_index, asc)                                        }
+                                        line.clear();
+                                    }
+    
+                                    if lines_buffer.len() == FILE_SORT_BUFFER {
+                                        let mut new_tmp_file_name = String::from(&tmp_file_name);
+                                        new_tmp_file_name.push_str(format!(".{}",&tmp_files.len()).as_str());
+                                        match File::open(new_tmp_file_name) {
+                                            Ok(mut tmp_f) => {
+                                                for elements in &lines_buffer {
+                                                    let mut first = true;
+                                                    for element in elements {
+                                                        if first {
+                                                            tmp_f.write(element.as_bytes());
+                                                            first = false;
+                                                        } else {
+                                                            tmp_f.write(format!(",{}",element).as_bytes());
+                                                        }
+                                                    }
+                                                }
+                                                tmp_f.seek(std::io::SeekFrom::Start(0));
+                                                tmp_files.push(tmp_f);
+                                            },
+                                            Err(_) => {
+                                                read = false;
+                                                valid_operation = false;
+                                            }
+                                        }
+                                        
+                                        lines_buffer.clear();
+                                    }
+                                }
+                            }
+                        }
+
+                        if valid_operation {
+                            return Ok(tmp_files)
+                        } else {
+                            return Err(3)
+                        }
+                    } else {
+                        return Err(error::ARCHIVO_VACIO)
+                    }
+                }    
+            }
+        }
+    }
+}
+
+fn insert_conditioned(elements: &[String], columns_opt: &Option<Vec<usize>>, lines_buffer: &mut Vec<Vec<String>>, col_index: &usize, filter: &Condition) {
+let (col_filter, condition) = filter;
+    if let Some(value) = &condition.value {
+        if operate_condition(&elements[col_filter as usize], value, &condition.condition) {
+            print_file_unconditional(columns_opt, elements)
+        }
+    } else {
+        print_file_unconditional(columns_opt, elements)
+    }
+}
+
+fn insert_unconditioned(elements: Vec<String>, columns_opt: &Option<Vec<usize>>, lines_buffer: &mut Vec<Vec<String>>, col_index: &usize, asc: &bool) {
+    let position: usize = find_insert_position(&elements, lines_buffer, col_index, asc);
+    
+    match columns_opt {
+        Some(columns) => { // SELECT columns FROM
+            let mut vector:Vec<String> = Vec::new();
+
+            let mut counter = 0;
+            while counter < elements.len() {
+                if columns.contains(&counter) {
+                    vector.push(elements[counter].to_string());
+                }
+
+                counter += 1;
+            }
+            lines_buffer.insert(position, vector);
+        }
+        None => lines_buffer.insert(position, elements),
+    }
+}
+
+fn find_insert_position(elements: &[String], lines_buffer: &mut Vec<Vec<String>>, col_index: &usize, asc: &bool) -> usize {
+    
 }
 
 fn read_and_save_file(query: &Query, col_filter: i32) -> Result<usize, u32> {
