@@ -1,5 +1,3 @@
-use std::collections::btree_map::Range;
-use std::fmt::format;
 use std::fs::{remove_file, rename, File, OpenOptions};
 use std::io::{BufRead, BufReader, Seek, Write};
 
@@ -149,7 +147,7 @@ fn exec_query_select(query: Query) {
     }
 }
 
-
+/* 
 fn sort_and_print_file(
     column_number: usize,
     query: &Query,
@@ -231,6 +229,7 @@ fn sort_and_print_file(
         }
     }
 }
+*/
 
 fn file_cleanup(files: Vec<String>) {
     for file in files {
@@ -245,6 +244,7 @@ fn find_sorted_position(
     asc: &bool,
 ) -> usize {
     // Insert into shifts everything to right.
+    0
 }
 
 fn exec_query_update(query: Query) {
@@ -533,8 +533,10 @@ fn read_into_sorted_files(query: &Query, col_index: usize, asc: &bool) -> Result
                                     if read {
                                         let elements = text_to_vec(&line, true);
                                         match &query.where_condition {
-                                            Some(condition) => insert_conditioned(&elements,&mut lines_buffer,col_index,condition, asc),
-                                            None => insert_unconditioned(elements, &query.columns, &mut lines_buffer, &col_index, asc)                                        }
+                                            Some(condition) => {},
+//                                            insert_conditioned(&elements,&mut lines_buffer,&col_index,condition, asc),
+                                            None => insert_unconditioned(elements, &query.columns, &mut lines_buffer, &col_index, asc)                                        
+                                        }
                                         line.clear();
                                     }
     
@@ -547,7 +549,7 @@ fn read_into_sorted_files(query: &Query, col_index: usize, asc: &bool) -> Result
                                                     let mut first = true;
                                                     for element in elements {
                                                         if first {
-                                                            tmp_f.write(element.as_bytes());
+                                                            let _ = tmp_f.write(element.as_bytes());
                                                             first = false;
                                                         } else {
                                                             tmp_f.write(format!(",{}",element).as_bytes());
@@ -583,6 +585,7 @@ fn read_into_sorted_files(query: &Query, col_index: usize, asc: &bool) -> Result
     }
 }
 
+/* 
 fn insert_conditioned(elements: &[String], columns_opt: &Option<Vec<usize>>, lines_buffer: &mut Vec<Vec<String>>, col_index: &usize, filter: &Condition) {
 let (col_filter, condition) = filter;
     if let Some(value) = &condition.value {
@@ -593,9 +596,10 @@ let (col_filter, condition) = filter;
         print_file_unconditional(columns_opt, elements)
     }
 }
+*/
 
 fn insert_unconditioned(elements: Vec<String>, columns_opt: &Option<Vec<usize>>, lines_buffer: &mut Vec<Vec<String>>, col_index: &usize, asc: &bool) {
-    let position: usize = find_insert_position(&elements, lines_buffer, col_index, asc);
+    let position: usize = find_insert_position(&elements, lines_buffer, 0,lines_buffer.len() - 1,*col_index, asc);
     
     match columns_opt {
         Some(columns) => { // SELECT columns FROM
@@ -615,8 +619,26 @@ fn insert_unconditioned(elements: Vec<String>, columns_opt: &Option<Vec<usize>>,
     }
 }
 
-fn find_insert_position(elements: &[String], lines_buffer: &mut Vec<Vec<String>>, col_index: &usize, asc: &bool) -> usize {
-    
+fn find_insert_position(elements: &Vec<String>, lines_buffer: &Vec<Vec<String>>, min_pos: usize, max_pos: usize , col_index: usize, asc: &bool) -> usize {
+    if max_pos - min_pos < 1 { 
+        min_pos
+    } else {
+        if elements[col_index] > lines_buffer[(min_pos+max_pos)/2][col_index] {
+            if *asc {
+                find_insert_position(elements, lines_buffer, (min_pos+max_pos)/2, max_pos, col_index, asc)
+            } else {
+                find_insert_position(elements, lines_buffer, min_pos, (min_pos+max_pos)/2, col_index, asc)
+            }
+        } else if elements[col_index] <  lines_buffer[(min_pos+max_pos)/2][col_index] {
+            if *asc {
+                find_insert_position(elements, lines_buffer, min_pos, (min_pos+max_pos)/2, col_index, asc)
+            } else {
+                find_insert_position(elements, lines_buffer, (min_pos+max_pos)/2, max_pos, col_index, asc)
+            }
+        } else {
+            (min_pos+max_pos)/2
+        }
+    } 
 }
 
 fn read_and_save_file(query: &Query, col_filter: i32) -> Result<usize, u32> {
