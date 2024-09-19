@@ -1,4 +1,5 @@
 use std::collections::btree_map::Range;
+use std::collections::LinkedList;
 use std::fs::{read, remove_file, rename, File, OpenOptions};
 use std::io::{BufRead, BufReader, Read, Seek, Write};
 use std::iter;
@@ -646,7 +647,7 @@ fn read_into_sorted_files(query: &Query, col_index: usize, asc: &bool) -> Result
                 Err(_) => return Err(3),
                 Ok(table_file) => {
                     let mut tmp_filenames: Vec<String> = Vec::new();
-                    let mut lines_buffer: Vec<Vec<String>> = Vec::new();
+                    let mut lines_buffer: LinkedList<Vec<String>> = Vec::new();
 
                     let mut reader: BufReader<File> = BufReader::new(table_file);
                     let mut line = String::new();
@@ -675,30 +676,7 @@ fn read_into_sorted_files(query: &Query, col_index: usize, asc: &bool) -> Result
                                     }
     
                                     if lines_buffer.len() == FILE_SORT_BUFFER {
-                                        let mut new_tmp_file_name = String::from(&tmp_file_name);
-                                        new_tmp_file_name.push_str(format!(".{}",&tmp_filenames.len()).as_str());
-
-                                        match File::open(&new_tmp_file_name) {
-                                            Ok(mut tmp_f) => {
-                                                for elements in &lines_buffer {
-                                                    let mut first = true;
-                                                    for element in elements {
-                                                        if first {
-                                                            let _ = tmp_f.write(element.as_bytes());
-                                                            first = false;
-                                                        } else {
-                                                            tmp_f.write(format!(",{}",element).as_bytes());
-                                                        }
-                                                    }
-                                                }
-                                                tmp_filenames.push(new_tmp_file_name);
-                                            },
-                                            Err(_) => {
-                                                read = false;
-                                                valid_operation = false;
-                                            }
-                                        }
-                                        
+                                        write_to_tmp_file(&tmp_file_name, &mut tmp_filenames, &lines_buffer, &mut read, &mut valid_operation);                                        
                                         lines_buffer.clear();
                                     }
                                 }
@@ -706,6 +684,7 @@ fn read_into_sorted_files(query: &Query, col_index: usize, asc: &bool) -> Result
                         }
 
                         if valid_operation {
+                            write_to_tmp_file(&tmp_file_name, &mut tmp_filenames, &lines_buffer, &mut read, &mut valid_operation);                                        
                             return Ok(tmp_filenames)
                         } else {
                             return Err(3)
@@ -715,6 +694,33 @@ fn read_into_sorted_files(query: &Query, col_index: usize, asc: &bool) -> Result
                     }
                 }    
             }
+        }
+    }
+}
+
+fn write_to_tmp_file(tmp_file_name: &String, tmp_filenames: &mut Vec<String>, lines_buffer: &Vec<Vec<String>>, read: &mut bool, valid_operation: &mut bool ) {
+    let mut new_tmp_file_name = String::from(tmp_file_name);
+    new_tmp_file_name.push_str(format!(".{}",&tmp_filenames.len()).as_str());
+
+    match File::create(&new_tmp_file_name) {
+        Ok(mut tmp_f) => {
+            for elements in lines_buffer {
+                let mut first = true;
+                for element in elements {
+                    if first {
+                        let _ = tmp_f.write(element.as_bytes());
+                        first = false;
+                    } else {
+                        let _ = tmp_f.write(format!(",{}",element).as_bytes());
+                    }
+                }
+                let _ = tmp_f.write("\n".as_bytes());
+            }
+            tmp_filenames.push(new_tmp_file_name);
+        },
+        Err(_) => {
+            *read = false;
+            *valid_operation = false;
         }
     }
 }
