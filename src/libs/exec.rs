@@ -647,7 +647,7 @@ fn read_into_sorted_files(query: &Query, col_index: usize, asc: &bool) -> Result
                 Err(_) => return Err(3),
                 Ok(table_file) => {
                     let mut tmp_filenames: Vec<String> = Vec::new();
-                    let mut lines_buffer: LinkedList<Vec<String>> = Vec::new();
+                    let mut lines_buffer: Vec<Vec<String>> = Vec::new();    // list maybe better ?
 
                     let mut reader: BufReader<File> = BufReader::new(table_file);
                     let mut line = String::new();
@@ -741,10 +741,10 @@ let (col_filter, condition) = filter;
 fn insert_unconditioned(elements: Vec<String>, columns_opt: &Option<Vec<usize>>, lines_buffer: &mut Vec<Vec<String>>, col_index: &usize, asc: &bool) {
     
     let position: usize; 
-    if lines_buffer.len() > 0 {
-        position = find_insert_position(&elements, lines_buffer, 0,lines_buffer.len() - 1,*col_index, asc);
-    } else {
+    if lines_buffer.is_empty() {
         position = 0;
+    } else {
+        position = find_insert_position(&elements, lines_buffer, 0,lines_buffer.len() - 1,*col_index, asc);
     }
 
     match columns_opt {
@@ -766,8 +766,28 @@ fn insert_unconditioned(elements: Vec<String>, columns_opt: &Option<Vec<usize>>,
 }
 
 fn find_insert_position(elements: &Vec<String>, lines_buffer: &Vec<Vec<String>>, min_pos: usize, max_pos: usize , col_index: usize, asc: &bool) -> usize {
-    if max_pos - min_pos <= 1 { 
-        min_pos
+    if min_pos == max_pos { 
+        if elements[col_index] < lines_buffer[min_pos][col_index] {
+            if *asc { min_pos     } 
+            else    { min_pos + 1 }
+        } else {
+            if *asc { min_pos + 1 }
+            else    { min_pos }
+        }
+    } else if min_pos + 1 == max_pos {
+        if elements[col_index] < lines_buffer[min_pos][col_index] {
+            if *asc { 
+                find_insert_position(elements, lines_buffer, min_pos, min_pos, col_index, asc)
+            } else {
+                find_insert_position(elements, lines_buffer, max_pos, max_pos, col_index, asc)
+            }
+        } else {
+            if *asc { 
+                find_insert_position(elements, lines_buffer, max_pos, max_pos, col_index, asc)
+            } else {
+                find_insert_position(elements, lines_buffer, min_pos, min_pos, col_index, asc)
+            }
+        }
     } else {
         let med = (min_pos+max_pos)/2;
         if *asc {
