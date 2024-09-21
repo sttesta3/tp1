@@ -136,9 +136,9 @@ fn exec_query_select(query: Query) {
 fn exec_query_select(query: Query) {
     match &query.order_by {
         Some((column, asc)) => {
-            print_header(&query);
             let col_filter: i32 = find_filter_column(&query);
             if let Some(col_index) = find_column(&query, column) {
+                print_header(&query);
                 if let Ok(files) = read_into_sorted_files(&query, col_index as usize, &asc) {
                     print_sorted_files(files, &col_index, &asc);
                 }    
@@ -627,7 +627,16 @@ fn find_column(query: &Query, column: &String) -> Option<usize> {
             if counter == args.len() {
                 return None;
             } else {
-                return Some(counter);
+                match &query.columns {
+                    None => return Some(counter),
+                    Some(cols) => {
+                        if cols.contains(&counter) {
+                            return Some(counter)
+                        } else {
+                            return None
+                        }
+                    }
+                }
             }
         }
         None => return None,
