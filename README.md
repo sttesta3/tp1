@@ -18,6 +18,8 @@ Pendientes:
 
 5. Refactor de funciones para que tengan menos de 30 lineas. Por una cuestión de tiempos se deja para el final. 
 
+6. Terminar trabajo sobre el parseo ( TODOs & funcion para imprimir errores ). Se decide para poder avanzar con las funcionalidades implementar las mismas tal que, en caso de haber un error, simplemente no ejecutarán nada.  
+
 Funcionalidades probadas OK
 
 1. SELECT * FROM 
@@ -35,6 +37,8 @@ Funcionalidades probadas OK
 7. SELECT c/ ORDER BY incondicional
 
 ### Detalles de implementación
+
+Para la logica del programa se decidio dividir en dos etapas: parseo y ejecucción. El punto del parseo es que se encuentre cualquier error previo a ejecucción del query, tal que no sea posible dañar la base de datos por error humano. De encontrarse un error se debe imprimir   
 
 Para la lógica booleana el objetivo era crear un arbol de condiciones formado por las relaciones de precedencia. 
 
