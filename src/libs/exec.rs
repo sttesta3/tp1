@@ -109,7 +109,7 @@ fn exec_query_insert(query: Query) {
     }
 }
 
-/* 
+/*
 fn exec_query_select(query: Query) {
     match &query.order_by {
         Some((column, asc)) => {
@@ -133,13 +133,13 @@ fn exec_query_select(query: Query) {
 fn exec_query_select(query: Query) {
     match &query.order_by {
         Some((column, asc)) => {
-            let col_filter: i32 = find_filter_column(&query);
+            let _col_filter: i32 = find_filter_column(&query);
             if let Some(col_index) = find_column(&query, column) {
                 print_header(&query);
-                if let Ok(files) = read_into_sorted_files(&query, col_index as usize, &asc) {
-                    print_sorted_files(&files, &col_index, &asc);
+                if let Ok(files) = read_into_sorted_files(&query, col_index, asc) {
+                    print_sorted_files(&files, &col_index, asc);
                     file_cleanup(&files);
-                }    
+                }
             }
         }
         None => {
@@ -155,21 +155,23 @@ fn file_cleanup(files: &Vec<String>) {
     }
 }
 
-fn print_sorted_files(files: &Vec<String>, col_index: &usize, asc: &bool) {
+fn print_sorted_files(files: &[String], col_index: &usize, asc: &bool) {
     // Pre: Name of tmp_files, column for ordering and selector of asc/desc
-    // Post: Prints from tmp_files in order 
-    if let Some(mut readers) = create_readers(files){
+    // Post: Prints from tmp_files in order
+    if let Some(mut readers) = create_readers(files) {
         if let Some(mut lines_buffer) = readers_read_first_line(&mut readers) {
-            // While there are lines to be printed 
-            while let Some(elements) = get_next_line(&mut lines_buffer, &mut readers, *col_index, asc) {
+            // While there are lines to be printed
+            while let Some(elements) =
+                get_next_line(&mut lines_buffer, &mut readers, *col_index, asc)
+            {
                 let mut counter = 0;
                 for element in elements {
-                    if ! element.eq("") {
+                    if !element.eq("") {
                         if counter == 0 {
-                            print!("{}",element);
+                            print!("{}", element);
                         } else {
-                            print!(",{}",element);
-                        }    
+                            print!(",{}", element);
+                        }
                         counter += 1;
                     }
                 }
@@ -179,38 +181,41 @@ fn print_sorted_files(files: &Vec<String>, col_index: &usize, asc: &bool) {
     }
 }
 
-fn get_next_line(lines_buffer: &mut Vec<Vec<String>>, readers: &mut Vec<BufReader<File>>, col_index: usize, asc: &bool) -> Option<Vec<String>> {
+fn get_next_line(
+    lines_buffer: &mut Vec<Vec<String>>,
+    readers: &mut [BufReader<File>],
+    col_index: usize,
+    asc: &bool,
+) -> Option<Vec<String>> {
     // Pre: Lines buffer, readers, col index for sorting and ascending/descending bool
     // Post: Next line, if not fully read
-    
+
     let mut line = String::new();
-    match find_next_line(lines_buffer,col_index,asc) {
-        Some(reader_index) => {
-            match &readers[reader_index].read_line(&mut line){
-                Ok(x) => {
-                    if *x > 0 {
-                        let _ = line.replace('\n',"");
-                        lines_buffer.push(text_to_vec(&line, true));
-                    } else {
-                        let empty_line_buf: Vec<String> = Vec::new();
-                        lines_buffer.push(empty_line_buf);
-                    }
-                    return Some( lines_buffer.swap_remove(reader_index) )
-                },
-                Err(_) => {
+    match find_next_line(lines_buffer, col_index, asc) {
+        Some(reader_index) => match &readers[reader_index].read_line(&mut line) {
+            Ok(x) => {
+                if *x > 0 {
+                    let _ = line.replace('\n', "");
+                    lines_buffer.push(text_to_vec(&line, true));
+                } else {
                     let empty_line_buf: Vec<String> = Vec::new();
                     lines_buffer.push(empty_line_buf);
-                    return Some( lines_buffer.swap_remove(reader_index) )
-                },
+                }
+                Some(lines_buffer.swap_remove(reader_index))
+            }
+            Err(_) => {
+                let empty_line_buf: Vec<String> = Vec::new();
+                lines_buffer.push(empty_line_buf);
+                Some(lines_buffer.swap_remove(reader_index))
             }
         },
-        None => return None
+        None => None,
     }
 }
 
-fn find_next_line(lines_buffer: &mut Vec<Vec<String>>, col_index: usize, asc: &bool) -> Option<usize> {
+fn find_next_line(lines_buffer: &mut [Vec<String>], col_index: usize, asc: &bool) -> Option<usize> {
     // Pre: Lines buffer, col index and ascending/descending
-    // Post: Index of next line, if any 
+    // Post: Index of next line, if any
 
     // Find first line
     let mut candidate = 0;
@@ -224,26 +229,31 @@ fn find_next_line(lines_buffer: &mut Vec<Vec<String>>, col_index: usize, asc: &b
         // Find lower line
         let mut counter = candidate + 1;
         while counter < lines_buffer.len() {
-            if ! lines_buffer[counter].is_empty() {
+            if !lines_buffer[counter].is_empty() {
                 if *asc {
-                    if operate_condition(&lines_buffer[counter][col_index], &lines_buffer[candidate][col_index], &condition::condition_type::ConditionOperator::Minor) {
+                    if operate_condition(
+                        &lines_buffer[counter][col_index],
+                        &lines_buffer[candidate][col_index],
+                        &condition::condition_type::ConditionOperator::Minor,
+                    ) {
                         candidate = counter;
-                    }                
-                } else{
-                    if operate_condition(&lines_buffer[counter][col_index], &lines_buffer[candidate][col_index], &condition::condition_type::ConditionOperator::Higher) {
-                        candidate = counter;
-                    }                
-                }    
+                    }
+                } else if operate_condition(
+                    &lines_buffer[counter][col_index],
+                    &lines_buffer[candidate][col_index],
+                    &condition::condition_type::ConditionOperator::Higher,
+                ) {
+                    candidate = counter;
+                }
             }
             counter += 1;
         }
-        
+
         Some(candidate)
     }
-
 }
 
-/* 
+/*
 fn get_next_line(lines_buffer: &mut Vec<Vec<String>>, readers: &mut Vec<BufReader<File>>, col_index: usize, asc: &bool) -> Option<Vec<String>> {
     // Post: Next line in order, if not fully read
     let mut line = String::new();
@@ -270,7 +280,7 @@ fn get_next_line(lines_buffer: &mut Vec<Vec<String>>, readers: &mut Vec<BufReade
             if counter == readers.len() {
                 None
             } else {
-                let new_line: Vec<String>; 
+                let new_line: Vec<String>;
                 match readers[candidate].1.read_line(&mut line){
                     Err(_) => new_line = Vec::new(),
                     Ok(read_result) => {
@@ -290,7 +300,7 @@ fn get_next_line(lines_buffer: &mut Vec<Vec<String>>, readers: &mut Vec<BufReade
                                     new_line = Vec::new();  // If this happen, then never read again from here
                                     readers[candidate].0 = FILE_SORT_BUFFER;
                                 }
-                            }    
+                            }
                         }
                     }
                 }
@@ -322,29 +332,29 @@ fn readers_read_first_line(readers: &mut Vec<BufReader<File>>) -> Option<Vec<Vec
     let mut line = String::new();
 
     for reader in readers {
-        match reader.read_line(&mut line){
+        match reader.read_line(&mut line) {
             Ok(_) => {
                 let _ = line.replace('\n', "");
                 result.push(text_to_vec(&line, true));
                 line.clear();
-            },
-            Err(_) => return None 
+            }
+            Err(_) => return None,
         }
     }
     Some(result)
 }
 
-fn create_readers(files: &Vec<String>) -> Option<Vec<BufReader<File>>> {
+fn create_readers(files: &[String]) -> Option<Vec<BufReader<File>>> {
     let mut valid = true;
     let mut readers: Vec<BufReader<File>> = Vec::new();
 
     let mut counter = 0;
-    while counter < files.len() && valid{
+    while counter < files.len() && valid {
         match File::open(&files[counter]) {
             Err(_) => valid = false,
             Ok(file) => {
                 readers.push(BufReader::new(file));
-                counter += 1;        
+                counter += 1;
             }
         }
     }
@@ -356,7 +366,7 @@ fn create_readers(files: &Vec<String>) -> Option<Vec<BufReader<File>>> {
     }
 }
 
-/* 
+/*
 fn sort_and_print_file(
     column_number: usize,
     query: &Query,
@@ -637,21 +647,21 @@ fn find_column(query: &Query, column: &String) -> Option<usize> {
             }
 
             if counter == args.len() {
-                return None;
+                None
             } else {
                 match &query.columns {
-                    None => return Some(counter),
+                    None => Some(counter),
                     Some(cols) => {
                         if cols.contains(&counter) {
-                            return Some(counter)
+                            Some(counter)
                         } else {
-                            return None
+                            None
                         }
                     }
                 }
             }
         }
-        None => return None,
+        None => None,
     }
 }
 
@@ -667,24 +677,21 @@ fn print_header(query: &Query) {
                         Some(columns) => {
                             line = line.replace('\n', "");
                             let args = text_to_vec(&line, true);
-                            let mut counter = 0;
                             let mut first = true;
-                            for arg in args {
+                            for (counter, arg) in args.into_iter().enumerate() {
                                 if columns.contains(&counter) {
                                     if first {
-                                        print!("{}",arg);
+                                        print!("{}", arg);
                                         first = false;
-                                    } else{
-                                        print!(",{}",arg);
+                                    } else {
+                                        print!(",{}", arg);
                                     }
-    
                                 }
-                                counter += 1
                             }
                             println!();
-                        },
-                        None => print!("{}",line)
-                    }    
+                        }
+                        None => print!("{}", line),
+                    }
                 }
             }
         }
@@ -720,24 +727,24 @@ fn read_and_print_file(query: &Query, col_filter: i32) {
     }
 }
 
-fn read_into_sorted_files(query: &Query, col_index: usize, asc: &bool) -> Result<Vec<String>,u32> {
+fn read_into_sorted_files(query: &Query, col_index: usize, asc: &bool) -> Result<Vec<String>, u32> {
     // Pre:  Query, the col index for sorting and bool of ascending/descending
-    // Post: Vec of tmp_files 
+    // Post: Vec of tmp_files
     match &query.table {
         None => Err(3),
         Some(table) => {
             let tmp_file_name = get_tmp_file_name(table);
             match File::open(table) {
-                Err(_) => return Err(3),
+                Err(_) => Err(3),
                 Ok(table_file) => {
                     let mut tmp_filenames: Vec<String> = Vec::new();
-                    let mut lines_buffer: Vec<Vec<String>> = Vec::new();    // list maybe better ?
+                    let mut lines_buffer: Vec<Vec<String>> = Vec::new(); // list maybe better ?
 
                     let mut reader: BufReader<File> = BufReader::new(table_file);
                     let mut line = String::new();
-    
-                    let mut read :bool = true;
-                    let mut valid_operation :bool = true;
+
+                    let mut read: bool = true;
+                    let mut valid_operation: bool = true;
                     if reader.read_line(&mut line).is_ok() {
                         line.clear();
                         while read {
@@ -745,22 +752,34 @@ fn read_into_sorted_files(query: &Query, col_index: usize, asc: &bool) -> Result
                                 Err(_) => {
                                     read = false;
                                     valid_operation = false;
-                                },
+                                }
                                 Ok(x) => {
                                     line = line.replace('\n', "");
                                     read = x != 0;
                                     if read {
                                         let elements = text_to_vec(&line, true);
                                         match &query.where_condition {
-                                            Some(condition) => {},
-//                                            insert_conditioned(&elements,&mut lines_buffer,&col_index,condition, asc),
-                                            None => insert_unconditioned(elements, &query.columns, &mut lines_buffer, &col_index, asc)                                        
+                                            Some(_condition) => {}
+                                            //                                            insert_conditioned(&elements,&mut lines_buffer,&col_index,condition, asc),
+                                            None => insert_unconditioned(
+                                                elements,
+                                                &query.columns,
+                                                &mut lines_buffer,
+                                                &col_index,
+                                                asc,
+                                            ),
                                         }
                                         line.clear();
                                     }
-    
+
                                     if lines_buffer.len() == FILE_SORT_BUFFER {
-                                        write_to_tmp_file(&tmp_file_name, &mut tmp_filenames, &lines_buffer, &mut read, &mut valid_operation);                                        
+                                        write_to_tmp_file(
+                                            &tmp_file_name,
+                                            &mut tmp_filenames,
+                                            &lines_buffer,
+                                            &mut read,
+                                            &mut valid_operation,
+                                        );
                                         lines_buffer.clear();
                                     }
                                 }
@@ -768,25 +787,37 @@ fn read_into_sorted_files(query: &Query, col_index: usize, asc: &bool) -> Result
                         }
 
                         if valid_operation {
-                            if ! lines_buffer.is_empty() {
-                                write_to_tmp_file(&tmp_file_name, &mut tmp_filenames, &lines_buffer, &mut read, &mut valid_operation);                                        
+                            if !lines_buffer.is_empty() {
+                                write_to_tmp_file(
+                                    &tmp_file_name,
+                                    &mut tmp_filenames,
+                                    &lines_buffer,
+                                    &mut read,
+                                    &mut valid_operation,
+                                );
                             }
-                            return Ok(tmp_filenames)
+                            Ok(tmp_filenames)
                         } else {
-                            return Err(3)
+                            Err(3)
                         }
                     } else {
-                        return Err(error::ARCHIVO_VACIO)
+                        Err(error::ARCHIVO_VACIO)
                     }
-                }    
+                }
             }
         }
     }
 }
 
-fn write_to_tmp_file(tmp_file_name: &String, tmp_filenames: &mut Vec<String>, lines_buffer: &Vec<Vec<String>>, read: &mut bool, valid_operation: &mut bool ) {
+fn write_to_tmp_file(
+    tmp_file_name: &String,
+    tmp_filenames: &mut Vec<String>,
+    lines_buffer: &Vec<Vec<String>>,
+    read: &mut bool,
+    valid_operation: &mut bool,
+) {
     let mut new_tmp_file_name = String::from(tmp_file_name);
-    new_tmp_file_name.push_str(format!(".{}",&tmp_filenames.len()).as_str());
+    new_tmp_file_name.push_str(format!(".{}", &tmp_filenames.len()).as_str());
 
     match File::create(&new_tmp_file_name) {
         Ok(mut tmp_f) => {
@@ -797,13 +828,13 @@ fn write_to_tmp_file(tmp_file_name: &String, tmp_filenames: &mut Vec<String>, li
                         let _ = tmp_f.write(element.as_bytes());
                         first = false;
                     } else {
-                        let _ = tmp_f.write(format!(",{}",element).as_bytes());
+                        let _ = tmp_f.write(format!(",{}", element).as_bytes());
                     }
                 }
                 let _ = tmp_f.write("\n".as_bytes());
             }
             tmp_filenames.push(new_tmp_file_name);
-        },
+        }
         Err(_) => {
             *read = false;
             *valid_operation = false;
@@ -811,7 +842,7 @@ fn write_to_tmp_file(tmp_file_name: &String, tmp_filenames: &mut Vec<String>, li
     }
 }
 
-/* 
+/*
 fn insert_conditioned(elements: &[String], columns_opt: &Option<Vec<usize>>, lines_buffer: &mut Vec<Vec<String>>, col_index: &usize, filter: &Condition) {
 let (col_filter, condition) = filter;
     if let Some(value) = &condition.value {
@@ -824,18 +855,30 @@ let (col_filter, condition) = filter;
 }
 */
 
-fn insert_unconditioned(elements: Vec<String>, columns_opt: &Option<Vec<usize>>, lines_buffer: &mut Vec<Vec<String>>, col_index: &usize, asc: &bool) {
-    
-    let position; 
-    if lines_buffer.is_empty() {
-        position = 0;
+fn insert_unconditioned(
+    elements: Vec<String>,
+    columns_opt: &Option<Vec<usize>>,
+    lines_buffer: &mut Vec<Vec<String>>,
+    col_index: &usize,
+    asc: &bool,
+) {
+    let position: usize = if lines_buffer.is_empty() {
+        0
     } else {
-        position = find_insert_position(&elements, lines_buffer, 0,lines_buffer.len() - 1,*col_index, asc);
-    } 
+        find_insert_position(
+            &elements,
+            lines_buffer,
+            0,
+            lines_buffer.len() - 1,
+            *col_index,
+            asc,
+        )
+    };
 
     match columns_opt {
-        Some(columns) => { // SELECT columns FROM
-            let mut vector:Vec<String> = Vec::new();
+        Some(columns) => {
+            // SELECT columns FROM
+            let mut vector: Vec<String> = Vec::new();
 
             let mut counter = 0;
             while counter < elements.len() {
@@ -851,50 +894,66 @@ fn insert_unconditioned(elements: Vec<String>, columns_opt: &Option<Vec<usize>>,
     }
 }
 
-fn find_insert_position(elements: &Vec<String>, lines_buffer: &Vec<Vec<String>>, min_pos: usize, max_pos: usize , col_index: usize, asc: &bool) -> usize {
-    let less_than_minor = operate_condition(&elements[col_index], &lines_buffer[min_pos][col_index], &condition::condition_type::ConditionOperator::Minor);
-    let less_than_med = operate_condition(&elements[col_index], &lines_buffer[(min_pos+max_pos)/2][col_index], &condition::condition_type::ConditionOperator::Minor);
+fn find_insert_position(
+    elements: &Vec<String>,
+    lines_buffer: &Vec<Vec<String>>,
+    min_pos: usize,
+    max_pos: usize,
+    col_index: usize,
+    asc: &bool,
+) -> usize {
+    let less_than_minor = operate_condition(
+        &elements[col_index],
+        &lines_buffer[min_pos][col_index],
+        &condition::condition_type::ConditionOperator::Minor,
+    );
+    let less_than_med = operate_condition(
+        &elements[col_index],
+        &lines_buffer[(min_pos + max_pos) / 2][col_index],
+        &condition::condition_type::ConditionOperator::Minor,
+    );
 
-    if min_pos == max_pos { 
+    if min_pos == max_pos {
         if less_than_minor {
-            if *asc { min_pos     } 
-            else    { min_pos + 1 }
+            if *asc {
+                min_pos
+            } else {
+                min_pos + 1
+            }
+        } else if *asc {
+            min_pos + 1
         } else {
-            if *asc { min_pos + 1 }
-            else    { min_pos     }
+            min_pos
         }
     } else if min_pos + 1 == max_pos {
         if less_than_minor {
-            if *asc { 
+            if *asc {
                 find_insert_position(elements, lines_buffer, min_pos, min_pos, col_index, asc)
             } else {
                 find_insert_position(elements, lines_buffer, max_pos, max_pos, col_index, asc)
             }
+        } else if *asc {
+            find_insert_position(elements, lines_buffer, max_pos, max_pos, col_index, asc)
         } else {
-            if *asc { 
-                find_insert_position(elements, lines_buffer, max_pos, max_pos, col_index, asc)
-            } else {
-                find_insert_position(elements, lines_buffer, min_pos, min_pos, col_index, asc)
-            }
+            find_insert_position(elements, lines_buffer, min_pos, min_pos, col_index, asc)
         }
     } else {
-        let med = (min_pos+max_pos)/2;
+        let med = (min_pos + max_pos) / 2;
         if *asc {
-            if less_than_med{
-                find_insert_position(elements, lines_buffer, min_pos, med, col_index, asc)
-            } else {
-                find_insert_position(elements, lines_buffer, med, max_pos, col_index, asc)
-            }
-        } else {
             if less_than_med {
-                find_insert_position(elements, lines_buffer, med, max_pos, col_index, asc)
-            } else {
                 find_insert_position(elements, lines_buffer, min_pos, med, col_index, asc)
+            } else {
+                find_insert_position(elements, lines_buffer, med, max_pos, col_index, asc)
             }
+        } else if less_than_med {
+            find_insert_position(elements, lines_buffer, med, max_pos, col_index, asc)
+        } else {
+            find_insert_position(elements, lines_buffer, min_pos, med, col_index, asc)
         }
-    }     
+    }
 }
 
+/*
 fn read_and_save_file(query: &Query, col_filter: i32) -> Result<usize, u32> {
     // Pre:  query, filter and
     // Post:
@@ -941,6 +1000,7 @@ fn read_and_save_file(query: &Query, col_filter: i32) -> Result<usize, u32> {
         return Err(1);
     }
 }
+*/
 
 fn print_file_unconditional(columns_opt: &Option<Vec<usize>>, elements: &[String]) {
     // Pre: Columns vector sorted incremental && Elements of line content vector
@@ -991,6 +1051,7 @@ fn print_file_conditioned(
     }
 }
 
+/*
 fn save_file_unconditional(columns_opt: &Option<Vec<usize>>, elements: &[String], file: &mut File) {
     // Pre: Columns vector sorted incremental && Elements of line content vector
     // Post: print to stdout the correct columns
@@ -1040,6 +1101,7 @@ fn save_file_conditioned(
         save_file_unconditional(columns_opt, elements, file)
     }
 }
+*/
 
 fn line_to_vec(line: &str) -> Vec<String> {
     let mut result: Vec<String> = Vec::new();
@@ -1059,37 +1121,97 @@ fn line_to_vec(line: &str) -> Vec<String> {
     result
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_bsearch1() {
-        let elements = vec![String::from("4"),String::from("jorge"),String::from("martell")];
-        let lines_buffer = vec![
-            vec![String::from("1"),String::from("diego"),String::from("mayor")],
-            vec![String::from("3"),String::from("pamela"),String::from("ureta")],
-            vec![String::from("5"),String::from("lucas"),String::from("catini")]
+        let elements = vec![
+            String::from("4"),
+            String::from("jorge"),
+            String::from("martell"),
         ];
-        let rt1 = find_insert_position(&elements, &lines_buffer, 0, lines_buffer.len() - 1, 0, &true);
+        let lines_buffer = vec![
+            vec![
+                String::from("1"),
+                String::from("diego"),
+                String::from("mayor"),
+            ],
+            vec![
+                String::from("3"),
+                String::from("pamela"),
+                String::from("ureta"),
+            ],
+            vec![
+                String::from("5"),
+                String::from("lucas"),
+                String::from("catini"),
+            ],
+        ];
+        let rt1 = find_insert_position(
+            &elements,
+            &lines_buffer,
+            0,
+            lines_buffer.len() - 1,
+            0,
+            &true,
+        );
         assert_eq!(rt1, 1);
     }
 
     #[test]
     fn test_bsearch2() {
-        let elements = vec![String::from("4"),String::from("Jorge"),String::from("martell")];
-        let lines_buffer = vec![
-        vec![String::from("4"),String::from("María"),String::from("Rodríguez")],
-        vec![String::from("10"),String::from("Manuel"),String::from("Allen")],
-        vec![String::from("6"),String::from("Laura"),String::from("Fernández")],
-        vec![String::from("5"),String::from("José"),String::from("López")],
-        vec![String::from("7"),String::from("Diego"),String::from("Torres")],
-        vec![String::from("3"),String::from("Carlos"),String::from("Gómez")],
-        vec![String::from("2"),String::from("Ana"),String::from("López")],
+        let elements = vec![
+            String::from("4"),
+            String::from("Jorge"),
+            String::from("martell"),
         ];
-        let rt2 = find_insert_position(&elements, &lines_buffer, 0, lines_buffer.len() - 1, 1, &false);
+        let lines_buffer = vec![
+            vec![
+                String::from("4"),
+                String::from("María"),
+                String::from("Rodríguez"),
+            ],
+            vec![
+                String::from("10"),
+                String::from("Manuel"),
+                String::from("Allen"),
+            ],
+            vec![
+                String::from("6"),
+                String::from("Laura"),
+                String::from("Fernández"),
+            ],
+            vec![
+                String::from("5"),
+                String::from("José"),
+                String::from("López"),
+            ],
+            vec![
+                String::from("7"),
+                String::from("Diego"),
+                String::from("Torres"),
+            ],
+            vec![
+                String::from("3"),
+                String::from("Carlos"),
+                String::from("Gómez"),
+            ],
+            vec![
+                String::from("2"),
+                String::from("Ana"),
+                String::from("López"),
+            ],
+        ];
+        let rt2 = find_insert_position(
+            &elements,
+            &lines_buffer,
+            0,
+            lines_buffer.len() - 1,
+            1,
+            &false,
+        );
         assert_eq!(rt2, 3);
     }
-
 }
