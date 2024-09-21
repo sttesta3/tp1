@@ -1,13 +1,10 @@
-use std::collections::btree_map::Range;
-use std::collections::LinkedList;
-use std::fs::{read, remove_file, rename, File, OpenOptions};
-use std::io::{BufRead, BufReader, Read, Seek, Write};
-use std::iter;
+use std::fs::{remove_file, rename, File, OpenOptions};
+use std::io::{BufRead, BufReader, Write};
 
 use crate::condition::{self, operate_condition, Condition};
 //use crate::condition::operate_condition;
 use crate::query::query_type::QueryType;
-use crate::query::{self, Query};
+use crate::query::Query;
 
 use super::error;
 use super::parsing::{self, get_file_first_line, text_to_vec};
@@ -140,7 +137,8 @@ fn exec_query_select(query: Query) {
             if let Some(col_index) = find_column(&query, column) {
                 print_header(&query);
                 if let Ok(files) = read_into_sorted_files(&query, col_index as usize, &asc) {
-                    print_sorted_files(files, &col_index, &asc);
+                    print_sorted_files(&files, &col_index, &asc);
+                    file_cleanup(&files);
                 }    
             }
         }
@@ -151,7 +149,13 @@ fn exec_query_select(query: Query) {
     }
 }
 
-fn print_sorted_files(files: Vec<String>, col_index: &usize, asc: &bool) {
+fn file_cleanup(files: &Vec<String>) {
+    for file in files {
+        let _ = remove_file(file);
+    }
+}
+
+fn print_sorted_files(files: &Vec<String>, col_index: &usize, asc: &bool) {
     // Pre: Name of tmp_files, column for ordering and selector of asc/desc
     // Post: Prints from tmp_files in order 
     if let Some(mut readers) = create_readers(files){
@@ -160,12 +164,14 @@ fn print_sorted_files(files: Vec<String>, col_index: &usize, asc: &bool) {
             while let Some(elements) = get_next_line(&mut lines_buffer, &mut readers, *col_index, asc) {
                 let mut counter = 0;
                 for element in elements {
-                    if counter == 0 {
-                        print!("{}",element);
-                    } else {
-                        print!(",{}",element);
+                    if ! element.eq("") {
+                        if counter == 0 {
+                            print!("{}",element);
+                        } else {
+                            print!(",{}",element);
+                        }    
+                        counter += 1;
                     }
-                    counter += 1;
                 }
                 println!();
             }
@@ -183,6 +189,7 @@ fn get_next_line(lines_buffer: &mut Vec<Vec<String>>, readers: &mut Vec<BufReade
             match &readers[reader_index].read_line(&mut line){
                 Ok(x) => {
                     if *x > 0 {
+                        let _ = line.replace('\n',"");
                         lines_buffer.push(text_to_vec(&line, true));
                     } else {
                         let empty_line_buf: Vec<String> = Vec::new();
@@ -315,14 +322,17 @@ fn readers_read_first_line(readers: &mut Vec<BufReader<File>>) -> Option<Vec<Vec
 
     for reader in readers {
         match reader.read_line(&mut line){
-            Ok(_) => result.push(text_to_vec(&line, true)),
+            Ok(_) => {
+                let _ = line.replace('\n', "");
+                result.push(text_to_vec(&line, true))
+            },
             Err(_) => return None 
         }
     }
     Some(result)
 }
 
-fn create_readers(files: Vec<String>) -> Option<Vec<BufReader<File>>> {
+fn create_readers(files: &Vec<String>) -> Option<Vec<BufReader<File>>> {
     let mut valid = true;
     let mut readers: Vec<BufReader<File>> = Vec::new();
 
