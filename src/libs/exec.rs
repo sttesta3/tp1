@@ -740,12 +740,12 @@ let (col_filter, condition) = filter;
 
 fn insert_unconditioned(elements: Vec<String>, columns_opt: &Option<Vec<usize>>, lines_buffer: &mut Vec<Vec<String>>, col_index: &usize, asc: &bool) {
     
-    let position: usize; 
+    let position; 
     if lines_buffer.is_empty() {
         position = 0;
     } else {
         position = find_insert_position(&elements, lines_buffer, 0,lines_buffer.len() - 1,*col_index, asc);
-    }
+    } 
 
     match columns_opt {
         Some(columns) => { // SELECT columns FROM
@@ -766,16 +766,19 @@ fn insert_unconditioned(elements: Vec<String>, columns_opt: &Option<Vec<usize>>,
 }
 
 fn find_insert_position(elements: &Vec<String>, lines_buffer: &Vec<Vec<String>>, min_pos: usize, max_pos: usize , col_index: usize, asc: &bool) -> usize {
+    let less_than_minor = operate_condition(&elements[col_index], &lines_buffer[min_pos][col_index], &condition::condition_type::ConditionOperator::Minor);
+    let less_than_med = operate_condition(&elements[col_index], &lines_buffer[(min_pos+max_pos)/2][col_index], &condition::condition_type::ConditionOperator::Minor);
+
     if min_pos == max_pos { 
-        if elements[col_index] < lines_buffer[min_pos][col_index] {
+        if less_than_minor {
             if *asc { min_pos     } 
             else    { min_pos + 1 }
         } else {
             if *asc { min_pos + 1 }
-            else    { min_pos }
+            else    { min_pos     }
         }
     } else if min_pos + 1 == max_pos {
-        if elements[col_index] < lines_buffer[min_pos][col_index] {
+        if less_than_minor {
             if *asc { 
                 find_insert_position(elements, lines_buffer, min_pos, min_pos, col_index, asc)
             } else {
@@ -791,19 +794,19 @@ fn find_insert_position(elements: &Vec<String>, lines_buffer: &Vec<Vec<String>>,
     } else {
         let med = (min_pos+max_pos)/2;
         if *asc {
-            if elements[col_index] < lines_buffer[med][col_index] {
+            if less_than_med{
                 find_insert_position(elements, lines_buffer, min_pos, med, col_index, asc)
             } else {
                 find_insert_position(elements, lines_buffer, med, max_pos, col_index, asc)
             }
         } else {
-            if elements[col_index] < lines_buffer[med][col_index] {
+            if less_than_med {
                 find_insert_position(elements, lines_buffer, med, max_pos, col_index, asc)
             } else {
                 find_insert_position(elements, lines_buffer, min_pos, med, col_index, asc)
             }
         }
-    } 
+    }     
 }
 
 fn read_and_save_file(query: &Query, col_filter: i32) -> Result<usize, u32> {
