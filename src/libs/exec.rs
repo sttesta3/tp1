@@ -9,7 +9,7 @@ use crate::query::Query;
 use super::error;
 use super::parsing::{self, get_file_first_line, text_to_vec};
 
-static FILE_SORT_BUFFER: usize = 20;
+static FILE_SORT_BUFFER: usize = 3;
 
 pub fn exec_query(query: Query) {
     if let Some(op) = &query.operation {
@@ -224,17 +224,18 @@ fn find_next_line(lines_buffer: &mut Vec<Vec<String>>, col_index: usize, asc: &b
         // Find lower line
         let mut counter = candidate + 1;
         while counter < lines_buffer.len() {
-            counter += 1;
-
-            if *asc {
-                if operate_condition(&lines_buffer[counter][col_index], &lines_buffer[candidate][col_index], &condition::condition_type::ConditionOperator::Minor) {
-                    candidate = counter;
-                }                
-            } else{
-                if operate_condition(&lines_buffer[counter][col_index], &lines_buffer[candidate][col_index], &condition::condition_type::ConditionOperator::Higher) {
-                    candidate = counter;
-                }                
+            if ! lines_buffer[counter].is_empty() {
+                if *asc {
+                    if operate_condition(&lines_buffer[counter][col_index], &lines_buffer[candidate][col_index], &condition::condition_type::ConditionOperator::Minor) {
+                        candidate = counter;
+                    }                
+                } else{
+                    if operate_condition(&lines_buffer[counter][col_index], &lines_buffer[candidate][col_index], &condition::condition_type::ConditionOperator::Higher) {
+                        candidate = counter;
+                    }                
+                }    
             }
+            counter += 1;
         }
         
         Some(candidate)
@@ -324,7 +325,8 @@ fn readers_read_first_line(readers: &mut Vec<BufReader<File>>) -> Option<Vec<Vec
         match reader.read_line(&mut line){
             Ok(_) => {
                 let _ = line.replace('\n', "");
-                result.push(text_to_vec(&line, true))
+                result.push(text_to_vec(&line, true));
+                line.clear();
             },
             Err(_) => return None 
         }
@@ -766,7 +768,9 @@ fn read_into_sorted_files(query: &Query, col_index: usize, asc: &bool) -> Result
                         }
 
                         if valid_operation {
-                            write_to_tmp_file(&tmp_file_name, &mut tmp_filenames, &lines_buffer, &mut read, &mut valid_operation);                                        
+                            if ! lines_buffer.is_empty() {
+                                write_to_tmp_file(&tmp_file_name, &mut tmp_filenames, &lines_buffer, &mut read, &mut valid_operation);                                        
+                            }
                             return Ok(tmp_filenames)
                         } else {
                             return Err(3)
