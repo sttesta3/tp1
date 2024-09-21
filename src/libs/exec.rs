@@ -167,13 +167,76 @@ fn print_sorted_files(files: Vec<String>, col_index: &usize, asc: &bool) {
                     }
                     counter += 1;
                 }
+                println!();
             }
         }
     }
 }
 
+fn get_next_line(lines_buffer: &mut Vec<Vec<String>>, readers: &mut Vec<BufReader<File>>, col_index: usize, asc: &bool) -> Option<Vec<String>> {
+    // Pre: Lines buffer, readers, col index for sorting and ascending/descending bool
+    // Post: Next line, if not fully read
+    
+    let mut line = String::new();
+    match find_next_line(lines_buffer,col_index,asc) {
+        Some(reader_index) => {
+            match &readers[reader_index].read_line(&mut line){
+                Ok(x) => {
+                    if *x > 0 {
+                        lines_buffer.push(text_to_vec(&line, true));
+                    } else {
+                        let empty_line_buf: Vec<String> = Vec::new();
+                        lines_buffer.push(empty_line_buf);
+                    }
+                    return Some( lines_buffer.swap_remove(reader_index) )
+                },
+                Err(_) => {
+                    let empty_line_buf: Vec<String> = Vec::new();
+                    lines_buffer.push(empty_line_buf);
+                    return Some( lines_buffer.swap_remove(reader_index) )
+                },
+            }
+        },
+        None => return None
+    }
+}
 
-fn get_next_line(lines_buffer: &mut Vec<Vec<String>>, readers: &mut Vec<(usize,BufReader<File>)>, col_index: usize, asc: &bool) -> Option<Vec<String>> {
+fn find_next_line(lines_buffer: &mut Vec<Vec<String>>, col_index: usize, asc: &bool) -> Option<usize> {
+    // Pre: Lines buffer, col index and ascending/descending
+    // Post: Index of next line, if any 
+
+    // Find first line
+    let mut candidate = 0;
+    while candidate < lines_buffer.len() && lines_buffer[candidate].is_empty() {
+        candidate += 1;
+    }
+
+    if candidate == lines_buffer.len() {
+        None
+    } else {
+        // Find lower line
+        let mut counter = candidate + 1;
+        while counter < lines_buffer.len() {
+            counter += 1;
+
+            if *asc {
+                if operate_condition(&lines_buffer[counter][col_index], &lines_buffer[candidate][col_index], &condition::condition_type::ConditionOperator::Minor) {
+                    candidate = counter;
+                }                
+            } else{
+                if operate_condition(&lines_buffer[counter][col_index], &lines_buffer[candidate][col_index], &condition::condition_type::ConditionOperator::Higher) {
+                    candidate = counter;
+                }                
+            }
+        }
+        
+        Some(candidate)
+    }
+
+}
+
+/* 
+fn get_next_line(lines_buffer: &mut Vec<Vec<String>>, readers: &mut Vec<BufReader<File>>, col_index: usize, asc: &bool) -> Option<Vec<String>> {
     // Post: Next line in order, if not fully read
     let mut line = String::new();
     match find_available_reader(&readers) {
@@ -230,7 +293,7 @@ fn get_next_line(lines_buffer: &mut Vec<Vec<String>>, readers: &mut Vec<(usize,B
     }
 }
 
-fn find_available_reader(readers: &Vec<(usize,BufReader<File>)>) -> Option<usize> {
+fn find_available_reader(readers: &Vec<BufReader<File>>) -> Option<usize> {
     // Pre: Readers
     // Post: First available reader position
     let mut counter = 0;
@@ -244,32 +307,31 @@ fn find_available_reader(readers: &Vec<(usize,BufReader<File>)>) -> Option<usize
         Some(counter)
     }
 }
+*/
 
-fn readers_read_first_line(readers: &mut Vec<(usize,BufReader<File>)>) -> Option<Vec<Vec<String>>> {
+fn readers_read_first_line(readers: &mut Vec<BufReader<File>>) -> Option<Vec<Vec<String>>> {
     let mut result: Vec<Vec<String>> = Vec::new();
     let mut line = String::new();
 
     for reader in readers {
-        if reader.1.read_line(&mut line).is_ok() {
-            result.push(text_to_vec(&line, true));
-            reader.0 += 1;
-        } else {
-            return None
+        match reader.read_line(&mut line){
+            Ok(_) => result.push(text_to_vec(&line, true)),
+            Err(_) => return None 
         }
     }
     Some(result)
 }
 
-fn create_readers(files: Vec<String>) -> Option<Vec<(usize,BufReader<File>)>> {
+fn create_readers(files: Vec<String>) -> Option<Vec<BufReader<File>>> {
     let mut valid = true;
-    let mut readers: Vec<(usize,BufReader<File>)> = Vec::new();
+    let mut readers: Vec<BufReader<File>> = Vec::new();
 
     let mut counter = 0;
     while counter < files.len() && valid{
         match File::open(&files[counter]) {
             Err(_) => valid = false,
             Ok(file) => {
-                readers.push((0,BufReader::new(file)));
+                readers.push(BufReader::new(file));
                 counter += 1;        
             }
         }
@@ -364,7 +426,7 @@ fn sort_and_print_file(
         }
     }
 }
-*/
+
 
 fn file_cleanup(files: Vec<String>) {
     for file in files {
@@ -381,6 +443,7 @@ fn find_sorted_position(
     // Insert into shifts everything to right.
     0
 }
+*/
 
 fn exec_query_update(query: Query) {
     if let Some(cond) = &query.where_condition {
@@ -599,7 +662,7 @@ fn print_header(query: &Query) {
                             }
                             println!();
                         },
-                        None => println!("{}",line)
+                        None => print!("{}",line)
                     }    
                 }
             }
