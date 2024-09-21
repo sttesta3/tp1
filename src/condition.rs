@@ -36,10 +36,10 @@ pub fn operate_condition(v1: &String, v2: &String, operator: &ConditionOperator)
     };
 
     match operator {
-        ConditionOperator::Minor => true,
-        ConditionOperator::MinorEqual => true,
+        ConditionOperator::Minor => v1 < v2,
+        ConditionOperator::MinorEqual => v1 <= v2,
         ConditionOperator::Equal => v1.eq(v2),
-        ConditionOperator::Higher => true,
-        ConditionOperator::HigherEqual => true,
+        ConditionOperator::Higher => v1 > v2,
+        ConditionOperator::HigherEqual => v1 >= v2,
     }
 }
