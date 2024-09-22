@@ -1,13 +1,21 @@
 pub enum ConditionOperator {
-    Minor,       // Int
-    MinorEqual,  // Int
-    Equal,       // Int and String
-    Higher,      // Int
-    HigherEqual, // Int
+    Minor,      
+    MinorEqual,  
+    Equal,       
+    Higher,      
+    HigherEqual, 
 }
 
 pub enum BooleanOperator {
     AND,
     OR,
-    NOT,
+    NOT,    // NOT.         Left child
+    I       // identity.    
 }
+
+impl PartialEq for BooleanOperator {
+    fn eq(&self, other: &Self) -> bool {
+        self == other
+    }
+}
+impl Eq for BooleanOperator {}
