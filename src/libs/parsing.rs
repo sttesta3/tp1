@@ -1,8 +1,8 @@
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
-use crate::condition::{build_condition, Condition};
-use crate::condition::complex_condition::{add_node_to_tree, build_complex_condition, build_simple_condition, ComplexCondition, tree_check, check_precedence};
+use crate::condition::{build_not_condition, build_condition, Condition};
+//use crate::condition::complex_condition::{add_node_to_tree, build_complex_condition, build_simple_condition, ComplexCondition, tree_check, check_precedence};
 use crate::condition::condition_type::{BooleanOperator, ConditionOperator};
 //use crate::condition::{add_node_to_tree, build_complex_condition, build_condition, build_empty_complex_condition, get_where_columns, tree_check, ComplexCondition, Condition};
 // use crate::condition::Condition;
@@ -212,80 +212,106 @@ fn get_columns_position(query: &Query, string_cols: &[String]) -> Result<Vec<usi
     }
 }
 
-fn parse_where_condition(query: &Query, args: &[String], counter: &mut usize) -> Result<ComplexCondition,u32> {
+fn parse_where_condition(query: &Query, args: &[String], counter: &mut usize) -> Result<Vec<Vec<Condition>>,u32> {
     // Pre: Query args and counter
     // Post: Complex condition for query 
     if args[*counter].eq("AND") || args[*counter].eq("OR") {
         Err(WHERE_MAL_FORMATEADO)    
     } else {
-        match get_condition_node(query,args,counter) {
-            Err(x) => Err(x),
-            Ok(mut root) => {   // Initial root 
-                if &root.operator == &BooleanOperator::AND || &root.operator == &BooleanOperator::OR {
-                    return Err(WHERE_MAL_FORMATEADO);
-                } else {
-                    while *counter < args.len() && ! args[*counter].eq("ORDER") {
-                        let opt_node = get_condition_node(query,args,counter) ;
-                        if opt_node.is_err() {
-                            return opt_node;
-                        } else if let Ok(new_node) = opt_node {
-                            let add_opt = add_node_to_tree(new_node, &mut root);
-                            if add_opt.is_err() {
-                                return add_opt;
-                            } else if let Ok(new_root) = add_opt {
-                                root = new_root;
-                            }
-                        }
-                    }
-                }
-                if tree_check(&root) {
-                    Ok(root)
-                } else {
-                    Err(WHERE_MAL_FORMATEADO)
-                }
+        // Parse into boolean vector 
+        let mut result: Vec<Vec<Condition>> = Vec::new();
+        result.push(Vec::new());
+        while *counter < args.len() && ! args[*counter].eq("ORDER") {
+            match parse_next_condition(query, args, counter, &mut result) {
+                Ok(_) => continue,
+                Err(x) => return Err(x)
             }
+        }
+
+        // Check valid result 
+        if check_valid_bool(&result){
+            Ok(result)
+        } else {
+            Err(WHERE_MAL_FORMATEADO)            
         }
     }
 }
 
-fn get_condition_node(query: &Query, args: &[String], counter: &mut usize) -> Result<ComplexCondition, u32> {
-    // Pre:  Query args and counter of args
-    // Post: New node && increments counter
-    let new_node: ComplexCondition;
-    if args[*counter].eq("AND") {
-        new_node = build_complex_condition(BooleanOperator::AND, None, None);
+fn parse_next_condition(query: &Query, args: &[String], counter: &mut usize, vec: &mut Vec<Vec<Condition>> ) -> Result<u32,u32> {
+    if args[*counter].eq("OR") {
+        if ! *counter + 3 < args.len() {
+            return Err(WHERE_MAL_FORMATEADO);
+        } else if args[*counter + 1].eq("AND") || args[*counter + 1].eq("OR") {
+            return Err(WHERE_MAL_FORMATEADO);
+        } 
+        vec.push(Vec::new());
         *counter += 1;
-    } else if args[*counter].eq("OR") {
-        new_node = build_complex_condition(BooleanOperator::OR, None, None);               
+    } else if args[*counter].eq("AND") {
+        if ! *counter + 3 < args.len() {
+            return Err(WHERE_MAL_FORMATEADO);
+        } else if args[*counter + 1].eq("AND") || args[*counter + 1].eq("OR") {
+            return Err(WHERE_MAL_FORMATEADO);
+        } 
         *counter += 1;
     } else if args[*counter].eq("NOT") {
-        new_node = build_complex_condition(BooleanOperator::NOT, None, None);     
+        if ! *counter + 3 < args.len() {
+            return Err(WHERE_MAL_FORMATEADO);
+        } else if args[*counter + 1].eq("AND") || args[*counter + 1].eq("OR") {
+            return Err(WHERE_MAL_FORMATEADO);
+        } 
+        let position = vec.len() - 1;
+        vec[position].push(build_not_condition()); // String vacio 
         *counter += 1;
     } else if *counter + 3 < args.len() {
         match get_columns_position(query, &[args[*counter].to_string()]) {
             Err(x) => return Err(x),
             Ok(x) => {
-                let simple_condition: Condition = if args[*counter + 2].eq("<") {
+                let simple_condition: Condition = if args[*counter + 1].eq("<") {
                     build_condition(x[0], args[*counter + 2].to_string(), ConditionOperator::Minor)
-                } else if args[*counter + 2].eq("<=") {
+                } else if args[*counter + 1].eq("<=") {
                     build_condition(x[0], args[*counter + 2].to_string(), ConditionOperator::MinorEqual)
-                } else if args[*counter + 2].eq("=") {
+                } else if args[*counter + 1].eq("=") {
                     build_condition(x[0], args[*counter + 2].to_string(), ConditionOperator::Equal)
-                } else if args[*counter + 2].eq(">=") {
+                } else if args[*counter + 1].eq(">=") {
                     build_condition(x[0], args[*counter + 2].to_string(), ConditionOperator::HigherEqual)
-                } else if args[*counter + 2].eq(">") {
+                } else if args[*counter + 1].eq(">") {
                     build_condition(x[0], args[*counter + 2].to_string(), ConditionOperator::Higher)
                 } else {
                     return Err(WHERE_MAL_FORMATEADO)                            
                 };
-                new_node = build_simple_condition(Some(simple_condition));
+                let position = vec.len() - 1;
+                vec[position].push(simple_condition);
                 *counter += 3;
             }
         }
     } else {
         return Err(WHERE_MAL_FORMATEADO)
     }
-    Ok(new_node)
+
+    Ok(0)
+}
+
+fn check_valid_bool(boolean_expresion: &Vec<Vec<Condition>>) -> bool {
+    // Pre: Boolean vector
+    // Post: Bool for valid or invalid
+    let mut valid = true;
+    let mut counter = 0;
+    let mut sub_counter;
+    let mut open_not = false;
+    while counter < boolean_expresion.len() && valid {
+        valid = boolean_expresion[counter].is_empty();
+
+        sub_counter = 0;
+        while sub_counter < boolean_expresion[counter].len() && valid {
+            open_not = ! ( open_not && boolean_expresion[counter][sub_counter].value.is_some() );
+            sub_counter += 1;
+        }  
+
+        valid = ! open_not;
+        counter += 1;        
+    }
+
+    valid
 }
 
 fn find_column_position(column_name: &String, columns: &[String]) -> Result<usize, u32> {
@@ -422,7 +448,7 @@ fn validate_delete_query(query: Query) -> Result<Query, u32> {
         match &query.table {
             Some(table) => match File::open(table) {
                 Ok(file) => match get_columns(file) {
-                    Some(columns) => check_columns_contains_condition(columns, query),
+                    Some(_) => Ok(query),
                     None => Err(error::ARCHIVO_VACIO),
                 },
                 Err(_) => Err(error::ARCHIVO_NO_PUDO_SER_ABIERTO),
@@ -468,27 +494,6 @@ fn get_columns(file: File) -> Option<Vec<String>> {
             Some(result)
         }
         Err(_) => None,
-    }
-}
-
-fn check_columns_contains_condition(columns: Vec<String>, query: Query) -> Result<Query, u32> {
-    // TODO
-    match get_where_columns(&query) {
-        Some(column) => {
-            if columns.contains(&column) {
-                Ok(query)
-            } else {
-                Err(error::ARCHIVO_NO_CONTIENE_COLUMNAS_SOLICITADAS)
-            }
-        }
-        None => Err(error::NO_WHERE),
-    }
-}
-
-fn get_where_columns(query: &Query) -> Option<String> {
-    match &query.where_condition {
-        Some(cond) => cond.column.as_ref().map(|col| col.to_string()),
-        None => None,
     }
 }
 
@@ -604,3 +609,66 @@ mod tests {
         );
     }
 }
+
+/* 
+fn check_columns_contains_condition(columns: Vec<String>, query: Query) -> Result<Query, u32> {
+    // TODO
+    match get_where_columns(&query) {
+        Some(column) => {
+            if columns.contains(&column) {
+                Ok(query)
+            } else {
+                Err(error::ARCHIVO_NO_CONTIENE_COLUMNAS_SOLICITADAS)
+            }
+        }
+        None => Err(error::NO_WHERE),
+    }
+}
+
+fn get_where_columns(query: &Query) -> Option<String> {
+    match &query.where_condition {
+        Some(cond) => cond.column.as_ref().map(|col| col.to_string()),
+        None => None,
+    }
+}
+
+fn get_condition_node(query: &Query, args: &[String], counter: &mut usize) -> Result<ComplexCondition, u32> {
+    // Pre:  Query args and counter of args
+    // Post: New node && increments counter
+    let new_node: ComplexCondition;
+    if args[*counter].eq("AND") {
+        new_node = build_complex_condition(BooleanOperator::AND, None, None);
+        *counter += 1;
+    } else if args[*counter].eq("OR") {
+        new_node = build_complex_condition(BooleanOperator::OR, None, None);               
+        *counter += 1;
+    } else if args[*counter].eq("NOT") {
+        new_node = build_complex_condition(BooleanOperator::NOT, None, None);     
+        *counter += 1;
+    } else if *counter + 3 < args.len() {
+        match get_columns_position(query, &[args[*counter].to_string()]) {
+            Err(x) => return Err(x),
+            Ok(x) => {
+                let simple_condition: Condition = if args[*counter + 2].eq("<") {
+                    build_condition(x[0], args[*counter + 2].to_string(), ConditionOperator::Minor)
+                } else if args[*counter + 2].eq("<=") {
+                    build_condition(x[0], args[*counter + 2].to_string(), ConditionOperator::MinorEqual)
+                } else if args[*counter + 2].eq("=") {
+                    build_condition(x[0], args[*counter + 2].to_string(), ConditionOperator::Equal)
+                } else if args[*counter + 2].eq(">=") {
+                    build_condition(x[0], args[*counter + 2].to_string(), ConditionOperator::HigherEqual)
+                } else if args[*counter + 2].eq(">") {
+                    build_condition(x[0], args[*counter + 2].to_string(), ConditionOperator::Higher)
+                } else {
+                    return Err(WHERE_MAL_FORMATEADO)                            
+                };
+                new_node = build_simple_condition(Some(simple_condition));
+                *counter += 3;
+            }
+        }
+    } else {
+        return Err(WHERE_MAL_FORMATEADO)
+    }
+    Ok(new_node)
+}
+*/

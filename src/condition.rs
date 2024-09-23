@@ -1,10 +1,8 @@
 pub mod condition_type;
-pub mod complex_condition;
-use condition_type::BooleanOperator;
+// pub mod complex_condition;
+// use condition_type::BooleanOperator;
+// use crate::libs::error;
 
-/*
-use crate::libs::error;
-*/
 
 use condition_type::ConditionOperator;
 
@@ -12,6 +10,14 @@ pub struct Condition {
     pub condition: ConditionOperator,
     pub column: Option<usize>,
     pub value: Option<String>,
+}
+
+pub fn build_not_condition() -> Condition {
+    Condition {
+        condition:  ConditionOperator::Equal,
+        column:     None,
+        value:      None
+    }
 }
 
 pub fn build_condition(column: usize, value: String, cond: ConditionOperator) -> Condition {
