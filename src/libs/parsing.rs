@@ -154,7 +154,8 @@ fn separate_args_select(args: &[String], path: &String, result: &mut Query) -> R
 
         if counter == args.len() {
             Ok(0)
-        } else {
+        } else if args[counter].eq("WHERE") {
+            counter += 1;
             match parse_where_condition(&result, args, &mut counter) {
                 Ok(cond) => result.where_condition = Some(cond),
                 Err(x) => return Err(x)
@@ -181,6 +182,9 @@ fn separate_args_select(args: &[String], path: &String, result: &mut Query) -> R
                 }
             }
             Ok(0)
+        }
+        else {
+            Err(WHERE_MAL_FORMATEADO)
         }
     }
 }
@@ -239,7 +243,7 @@ fn parse_where_condition(query: &Query, args: &[String], counter: &mut usize) ->
 
 fn parse_next_condition(query: &Query, args: &[String], counter: &mut usize, vec: &mut Vec<Vec<Condition>> ) -> Result<u32,u32> {
     if args[*counter].eq("OR") {
-        if ! *counter + 3 < args.len() {
+        if ! *counter + 2 < args.len() {
             return Err(WHERE_MAL_FORMATEADO);
         } else if args[*counter + 1].eq("AND") || args[*counter + 1].eq("OR") {
             return Err(WHERE_MAL_FORMATEADO);
@@ -247,14 +251,14 @@ fn parse_next_condition(query: &Query, args: &[String], counter: &mut usize, vec
         vec.push(Vec::new());
         *counter += 1;
     } else if args[*counter].eq("AND") {
-        if ! *counter + 3 < args.len() {
+        if ! *counter + 2 < args.len() {
             return Err(WHERE_MAL_FORMATEADO);
         } else if args[*counter + 1].eq("AND") || args[*counter + 1].eq("OR") {
             return Err(WHERE_MAL_FORMATEADO);
         } 
         *counter += 1;
     } else if args[*counter].eq("NOT") {
-        if ! *counter + 3 < args.len() {
+        if ! *counter + 2 < args.len() {
             return Err(WHERE_MAL_FORMATEADO);
         } else if args[*counter + 1].eq("AND") || args[*counter + 1].eq("OR") {
             return Err(WHERE_MAL_FORMATEADO);
@@ -262,7 +266,7 @@ fn parse_next_condition(query: &Query, args: &[String], counter: &mut usize, vec
         let position = vec.len() - 1;
         vec[position].push(build_not_condition()); // String vacio 
         *counter += 1;
-    } else if *counter + 3 < args.len() {
+    } else if *counter + 2 < args.len() {
         match get_columns_position(query, &[args[*counter].to_string()]) {
             Err(x) => return Err(x),
             Ok(x) => {
