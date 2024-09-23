@@ -1,7 +1,7 @@
 use std::fs::{remove_file, rename, File, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
 
-use crate::condition::{self, operate_condition, Condition};
+use crate::condition::{self, operate_condition, operate_full_condition, Condition};
 //use crate::condition::operate_condition;
 use crate::query::query_type::QueryType;
 use crate::query::Query;
@@ -24,52 +24,48 @@ pub fn exec_query(query: Query) {
 
 fn exec_query_delete(query: Query) {
     if let Some(cond) = &query.where_condition {
-        if let Some(value) = &cond.value {
-            if let Some(table) = &query.table {
-                // Check conditions for query. if not, don't do anything
-                let tmp_file_name = get_tmp_file_name(table);
-                let mut valid_operation = true;
-                match File::open(table) {
-                    Ok(file) => match File::create(&tmp_file_name) {
-                        Ok(mut tmp_file) => {
-                            let col_index = find_filter_column(&query);
-                            let mut reader: BufReader<File> = BufReader::new(file);
-                            let mut line = String::new();
-
-                            let mut read = true;
-                            while read {
-                                if let Ok(x) = reader.read_line(&mut line) {
-                                    line = line.replace('\n', "");
-                                    read = x != 0;
-                                    if read {
-                                        let elements = line_to_vec(&line);
-                                        if !operate_condition(
-                                            &elements[col_index as usize],
-                                            value,
-                                            &cond.condition,
-                                        ) {
-                                            line.push('\n');
-                                            if let Err(_error) = tmp_file.write(line.as_bytes()) {
-                                                read = false;
-                                                valid_operation = false;
-                                            }
+        if let Some(table) = &query.table {
+            // Check conditions for query. if not, don't do anything
+            let tmp_file_name = get_tmp_file_name(table);
+            let mut valid_operation = true;
+            match File::open(table) {
+                Ok(file) => match File::create(&tmp_file_name) {
+                    Ok(mut tmp_file) => {
+                        let mut reader: BufReader<File> = BufReader::new(file);
+                        let mut line = String::new();
+                        
+                        let mut read = true;
+                        while read {
+                            if let Ok(x) = reader.read_line(&mut line) {
+                                line = line.replace('\n', "");
+                                read = x != 0;
+                                if read {
+                                    let elements = line_to_vec(&line);
+                                    if !operate_full_condition(
+                                        &elements,
+                                        cond
+                                    ) {
+                                        line.push('\n');
+                                        if let Err(_error) = tmp_file.write(line.as_bytes()) {
+                                            read = false;
+                                            valid_operation = false;
                                         }
                                     }
-                                    line.clear();
-                                } else {
-                                    read = false;
-                                    valid_operation = false;
                                 }
+                                line.clear();
+                            } else {
+                                read = false;
+                                valid_operation = false;
                             }
                         }
-                        Err(_) => valid_operation = false,
-                    },
+                    }
                     Err(_) => valid_operation = false,
-                }
-
-                if remove_old_file(table, &tmp_file_name, valid_operation).is_err() {
-                    println!("Error en manipulación de archivos");
-                }
+                },
+                Err(_) => valid_operation = false,
+            }
+            
+            if remove_old_file(table, &tmp_file_name, valid_operation).is_err() {
+                println!("Error en manipulación de archivos");
             }
         }
     }
@@ -133,7 +129,6 @@ fn exec_query_select(query: Query) {
 fn exec_query_select(query: Query) {
     match &query.order_by {
         Some((column, asc)) => {
-            let _col_filter: i32 = find_filter_column(&query);
             if let Some(col_index) = find_column(&query, column) {
                 print_header(&query);
                 if let Ok(files) = read_into_sorted_files(&query, col_index, asc) {
@@ -143,8 +138,8 @@ fn exec_query_select(query: Query) {
             }
         }
         None => {
-            let col_index: i32 = find_filter_column(&query);
-            read_and_print_file(&query, col_index);
+//            let col_index: i32 = find_filter_column(&query);
+            read_and_print_file(&query);
         }
     }
 }
@@ -469,7 +464,6 @@ fn find_sorted_position(
 
 fn exec_query_update(query: Query) {
     if let Some(cond) = &query.where_condition {
-        if let Some(value) = &cond.value {
             if let Some(columns) = &query.columns {
                 if let Some(values) = &query.values {
                     if let Some(table) = &query.table {
@@ -478,7 +472,6 @@ fn exec_query_update(query: Query) {
                         match File::open(table) {
                             Ok(file) => match File::create(&tmp_file) {
                                 Ok(mut tmp_file) => {
-                                    let col_index = find_filter_column(&query);
                                     let mut reader: BufReader<File> = BufReader::new(file);
                                     let mut line = String::new();
 
@@ -489,10 +482,9 @@ fn exec_query_update(query: Query) {
                                             if read {
                                                 line = line.replace('\n', "");
                                                 let elements = line_to_vec(&line);
-                                                if !operate_condition(
-                                                    &elements[col_index as usize],
-                                                    value,
-                                                    &cond.condition,
+                                                if !operate_full_condition(
+                                                    &elements,
+                                                    cond
                                                 ) {
                                                     // Line not updated
                                                     line.push('\n');
@@ -531,7 +523,6 @@ fn exec_query_update(query: Query) {
                     }
                 }
             }
-        }
     }
 }
 
@@ -595,6 +586,7 @@ fn find_total_columns(query: &Query) -> usize {
     }
 }
 
+/* 
 fn find_filter_column(query: &Query) -> i32 {
     let mut col_index_filter = -1;
     match &query.where_condition {
@@ -636,6 +628,7 @@ fn find_filter_column(query: &Query) -> i32 {
     }
     col_index_filter
 }
+*/
 
 fn find_column(query: &Query, column: &String) -> Option<usize> {
     match get_file_first_line(query) {
@@ -698,7 +691,7 @@ fn print_header(query: &Query) {
     }
 }
 
-fn read_and_print_file(query: &Query, col_filter: i32) {
+fn read_and_print_file(query: &Query) {
     if let Some(table) = &query.table {
         if let Ok(f) = File::open(table) {
             let mut reader: BufReader<File> = BufReader::new(f);
@@ -714,7 +707,7 @@ fn read_and_print_file(query: &Query, col_filter: i32) {
                         match &query.where_condition {
                             Some(condition) => print_file_conditioned(
                                 &query.columns,
-                                (col_filter, condition),
+                                &condition,
                                 &elements,
                             ),
                             None => print_file_unconditional(&query.columns, &elements),
@@ -1038,15 +1031,10 @@ fn print_file_unconditional(columns_opt: &Option<Vec<usize>>, elements: &[String
 
 fn print_file_conditioned(
     columns_opt: &Option<Vec<usize>>,
-    filter: (i32, &Condition),
+    condition: &Vec<Vec<Condition>>,
     elements: &[String],
 ) {
-    let (col_filter, condition) = filter;
-    if let Some(value) = &condition.value {
-        if operate_condition(&elements[col_filter as usize], value, &condition.condition) {
-            print_file_unconditional(columns_opt, elements)
-        }
-    } else {
+    if operate_full_condition(&elements, condition) {
         print_file_unconditional(columns_opt, elements)
     }
 }
