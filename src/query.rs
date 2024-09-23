@@ -3,6 +3,7 @@ pub mod query_type;
 use query_type::QueryType;
 
 use crate::condition::Condition;
+//use crate::complex_condition::ComplexCondition,
 
 // use crate::condition::ComplexCondition;
 
@@ -15,9 +16,9 @@ pub struct Query {
     pub operation: Option<QueryType>, // DELETE, INSERT, SELECT, UPDATE
     pub table: Option<String>,        // DELETE, INSERT, SELECT, UPDATE
     pub columns: Option<Vec<usize>>,  // INSERT, SELECT, UPDATE
-    pub where_condition: Option<Condition>, // DELETE (always), SELECT (sometimes), UPDATE (always) .
-    pub order_by: Option<(String, bool)>,   // SELECT (sometimes)
-    pub values: Option<Vec<String>>,        // INSERT, UPDATE (in update is set)
+    pub where_condition: Option<Vec<Vec<Condition>>>, // DELETE (always), SELECT (sometimes), UPDATE (always) .
+    pub order_by: Option<(String, bool)>,             // SELECT (sometimes)
+    pub values: Option<Vec<String>>,                  // INSERT, UPDATE (in update is set)
 }
 
 pub fn build_empty_query() -> Query {

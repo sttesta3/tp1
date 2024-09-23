@@ -1,7 +1,8 @@
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
-use crate::condition::build_condition;
+use crate::condition::{build_condition, build_not_condition, Condition};
+//use crate::condition::complex_condition::{add_node_to_tree, build_complex_condition, build_simple_condition, ComplexCondition, tree_check, check_precedence};
 use crate::condition::condition_type::ConditionOperator;
 //use crate::condition::{add_node_to_tree, build_complex_condition, build_condition, build_empty_complex_condition, get_where_columns, tree_check, ComplexCondition, Condition};
 // use crate::condition::Condition;
@@ -10,7 +11,7 @@ use crate::query::build_empty_query;
 use crate::query::query_type::QueryType;
 use crate::query::{Query, DELETE_MIN_LEN, INSERT_MIN_LEN, SELECT_MIN_LEN, UPDATE_MIN_LEN};
 
-use super::error::SELECT_MAL_FORMATEADO;
+use super::error::{DELETE_MAL_FORMATEADO, WHERE_MAL_FORMATEADO};
 
 pub fn build_query(text_query: &String, path: &String) -> Result<Query, u32> {
     // Full "Compilation" process of query. Tokenization, sintactic analysis, semantic and build
@@ -41,48 +42,16 @@ fn separate_args_delete(args: &[String], path: &String, result: &mut Query) -> R
 
         if args.len() != DELETE_MIN_LEN {
             return Err(error::DELETE_MAL_FORMATEADO);
-        } else {
-            /* TODO: Code for complex conditions
-            match add_node_to_tree(args, &mut 4, build_empty_complex_condition()) {
+        } else if args[3].eq("WHERE") {
+            let mut counter: usize = 4;
+            match parse_where_condition(result, args, &mut counter) {
                 Ok(cond) => result.where_condition = Some(cond),
-                Err(x) => return Err(x)
+                Err(x) => return Err(x),
             }
-            */
-
-            if args[5].eq("<") {
-                result.where_condition = Some(build_condition(
-                    args[4].to_string(),
-                    args[6].to_string(),
-                    ConditionOperator::Minor,
-                ))
-            } else if args[5].eq("<=") {
-                result.where_condition = Some(build_condition(
-                    args[4].to_string(),
-                    args[6].to_string(),
-                    ConditionOperator::MinorEqual,
-                ))
-            } else if args[5].eq("=") {
-                result.where_condition = Some(build_condition(
-                    args[4].to_string(),
-                    args[6].to_string(),
-                    ConditionOperator::Equal,
-                ))
-            } else if args[5].eq(">=") {
-                result.where_condition = Some(build_condition(
-                    args[4].to_string(),
-                    args[6].to_string(),
-                    ConditionOperator::HigherEqual,
-                ))
-            } else if args[5].eq(">") {
-                result.where_condition = Some(build_condition(
-                    args[4].to_string(),
-                    args[6].to_string(),
-                    ConditionOperator::Higher,
-                ))
-            } else {
-                return Err(error::WHERE_MAL_FORMATEADO);
-            }
+        } else {
+            return Err(DELETE_MAL_FORMATEADO);
         }
+
         Ok(0)
     }
 }
@@ -148,45 +117,9 @@ fn separate_args_update(args: &[String], path: &String, result: &mut Query) -> R
         }
         result.values = Some(values);
 
-        /* TODO: Code for complex conditions
-        counter += 1;
-        match add_node_to_tree(args, &mut counter, build_empty_complex_condition()) {
+        match parse_where_condition(result, args, &mut counter) {
             Ok(cond) => result.where_condition = Some(cond),
-            Err(x) => return Err(x)
-        }
-        */
-        if args[8].eq("<") {
-            result.where_condition = Some(build_condition(
-                args[7].to_string(),
-                args[9].to_string(),
-                ConditionOperator::Minor,
-            ))
-        } else if args[8].eq("<=") {
-            result.where_condition = Some(build_condition(
-                args[7].to_string(),
-                args[9].to_string(),
-                ConditionOperator::MinorEqual,
-            ))
-        } else if args[8].eq("=") {
-            result.where_condition = Some(build_condition(
-                args[7].to_string(),
-                args[9].to_string(),
-                ConditionOperator::Equal,
-            ))
-        } else if args[8].eq(">=") {
-            result.where_condition = Some(build_condition(
-                args[7].to_string(),
-                args[9].to_string(),
-                ConditionOperator::HigherEqual,
-            ))
-        } else if args[8].eq(">") {
-            result.where_condition = Some(build_condition(
-                args[7].to_string(),
-                args[9].to_string(),
-                ConditionOperator::Higher,
-            ))
-        } else {
-            return Err(error::WHERE_MAL_FORMATEADO);
+            Err(x) => return Err(x),
         }
 
         Ok(0)
@@ -221,55 +154,11 @@ fn separate_args_select(args: &[String], path: &String, result: &mut Query) -> R
 
         if counter == args.len() {
             Ok(0)
-        } else {
-            /* TODO: Code for complex conditions
-            match add_node_to_tree(args, &mut  counter, build_empty_complex_condition()) {
+        } else if args[counter].eq("WHERE") {
+            counter += 1;
+            match parse_where_condition(result, args, &mut counter) {
                 Ok(cond) => result.where_condition = Some(cond),
-                Err(x) => return Err(x)
-            }
-            */
-            if counter + 3 > args.len() {
-                return Err(SELECT_MAL_FORMATEADO);
-            } else if args[counter].eq("WHERE") {
-                counter += 1;
-                if args[counter + 1].eq("<") {
-                    result.where_condition = Some(build_condition(
-                        args[counter].to_string(),
-                        args[counter + 2].to_string(),
-                        ConditionOperator::Minor,
-                    ));
-                    counter += 3;
-                } else if args[counter + 1].eq("<=") {
-                    result.where_condition = Some(build_condition(
-                        args[counter].to_string(),
-                        args[counter + 2].to_string(),
-                        ConditionOperator::MinorEqual,
-                    ));
-                    counter += 3;
-                } else if args[counter + 1].eq("=") {
-                    result.where_condition = Some(build_condition(
-                        args[counter].to_string(),
-                        args[counter + 2].to_string(),
-                        ConditionOperator::Equal,
-                    ));
-                    counter += 3;
-                } else if args[counter + 1].eq(">=") {
-                    result.where_condition = Some(build_condition(
-                        args[counter].to_string(),
-                        args[counter + 2].to_string(),
-                        ConditionOperator::HigherEqual,
-                    ));
-                    counter += 3;
-                } else if args[counter + 1].eq(">") {
-                    result.where_condition = Some(build_condition(
-                        args[counter].to_string(),
-                        args[counter + 2].to_string(),
-                        ConditionOperator::Higher,
-                    ));
-                    counter += 3;
-                } else {
-                    return Err(error::WHERE_MAL_FORMATEADO);
-                }
+                Err(x) => return Err(x),
             }
 
             if counter < args.len() {
@@ -293,6 +182,8 @@ fn separate_args_select(args: &[String], path: &String, result: &mut Query) -> R
                 }
             }
             Ok(0)
+        } else {
+            Err(WHERE_MAL_FORMATEADO)
         }
     }
 }
@@ -322,6 +213,124 @@ fn get_columns_position(query: &Query, string_cols: &[String]) -> Result<Vec<usi
         }
         None => Err(error::ARCHIVO_NO_PUDO_SER_ABIERTO),
     }
+}
+
+fn parse_where_condition(
+    query: &Query,
+    args: &[String],
+    counter: &mut usize,
+) -> Result<Vec<Vec<Condition>>, u32> {
+    // Pre: Query args and counter
+    // Post: Complex condition for query
+    if args[*counter].eq("AND") || args[*counter].eq("OR") {
+        Err(WHERE_MAL_FORMATEADO)
+    } else {
+        // Parse into boolean vector
+        let mut result: Vec<Vec<Condition>> = Vec::new();
+        result.push(Vec::new());
+        while *counter < args.len() && !args[*counter].eq("ORDER") {
+            match parse_next_condition(query, args, counter, &mut result) {
+                Ok(_) => continue,
+                Err(x) => return Err(x),
+            }
+        }
+
+        // Check valid result
+        if check_valid_bool(&result) {
+            Ok(result)
+        } else {
+            Err(WHERE_MAL_FORMATEADO)
+        }
+    }
+}
+
+fn parse_next_condition(
+    query: &Query,
+    args: &[String],
+    counter: &mut usize,
+    vec: &mut Vec<Vec<Condition>>,
+) -> Result<u32, u32> {
+    if !*counter + 2 < args.len() {
+        return Err(WHERE_MAL_FORMATEADO);
+    } else if args[*counter + 1].eq("AND") || args[*counter + 1].eq("OR") {
+        return Err(WHERE_MAL_FORMATEADO);
+    } else if args[*counter].eq("OR") {
+        vec.push(Vec::new());
+        *counter += 1;
+    } else if args[*counter].eq("AND") {
+        *counter += 1;
+    } else if args[*counter].eq("NOT") {
+        let position = vec.len() - 1;
+        vec[position].push(build_not_condition()); // String vacio
+        *counter += 1;
+    } else {
+        match get_columns_position(query, &[args[*counter].to_string()]) {
+            Err(x) => return Err(x),
+            Ok(x) => {
+                let simple_condition: Condition = if args[*counter + 1].eq("<") {
+                    build_condition(
+                        x[0],
+                        args[*counter + 2].to_string(),
+                        ConditionOperator::Minor,
+                    )
+                } else if args[*counter + 1].eq("<=") {
+                    build_condition(
+                        x[0],
+                        args[*counter + 2].to_string(),
+                        ConditionOperator::MinorEqual,
+                    )
+                } else if args[*counter + 1].eq("=") {
+                    build_condition(
+                        x[0],
+                        args[*counter + 2].to_string(),
+                        ConditionOperator::Equal,
+                    )
+                } else if args[*counter + 1].eq(">=") {
+                    build_condition(
+                        x[0],
+                        args[*counter + 2].to_string(),
+                        ConditionOperator::HigherEqual,
+                    )
+                } else if args[*counter + 1].eq(">") {
+                    build_condition(
+                        x[0],
+                        args[*counter + 2].to_string(),
+                        ConditionOperator::Higher,
+                    )
+                } else {
+                    return Err(WHERE_MAL_FORMATEADO);
+                };
+                let position = vec.len() - 1;
+                vec[position].push(simple_condition);
+                *counter += 3;
+            }
+        }
+    }
+
+    Ok(0)
+}
+
+fn check_valid_bool(boolean_expresion: &[Vec<Condition>]) -> bool {
+    // Pre: Boolean vector
+    // Post: Bool for valid or invalid
+    let mut valid = true;
+    let mut counter = 0;
+    let mut sub_counter;
+    let mut open_not = false;
+    while counter < boolean_expresion.len() && valid {
+        valid = boolean_expresion[counter].is_empty();
+
+        sub_counter = 0;
+        while sub_counter < boolean_expresion[counter].len() && valid {
+            open_not = !(open_not && boolean_expresion[counter][sub_counter].value.is_some());
+            sub_counter += 1;
+        }
+
+        valid = !open_not;
+        counter += 1;
+    }
+
+    valid
 }
 
 fn find_column_position(column_name: &String, columns: &[String]) -> Result<usize, u32> {
@@ -458,7 +467,7 @@ fn validate_delete_query(query: Query) -> Result<Query, u32> {
         match &query.table {
             Some(table) => match File::open(table) {
                 Ok(file) => match get_columns(file) {
-                    Some(columns) => check_columns_contains_condition(columns, query),
+                    Some(_) => Ok(query),
                     None => Err(error::ARCHIVO_VACIO),
                 },
                 Err(_) => Err(error::ARCHIVO_NO_PUDO_SER_ABIERTO),
@@ -504,27 +513,6 @@ fn get_columns(file: File) -> Option<Vec<String>> {
             Some(result)
         }
         Err(_) => None,
-    }
-}
-
-fn check_columns_contains_condition(columns: Vec<String>, query: Query) -> Result<Query, u32> {
-    // TODO
-    match get_where_columns(&query) {
-        Some(column) => {
-            if columns.contains(&column) {
-                Ok(query)
-            } else {
-                Err(error::ARCHIVO_NO_CONTIENE_COLUMNAS_SOLICITADAS)
-            }
-        }
-        None => Err(error::NO_WHERE),
-    }
-}
-
-fn get_where_columns(query: &Query) -> Option<String> {
-    match &query.where_condition {
-        Some(cond) => cond.column.as_ref().map(|col| col.to_string()),
-        None => None,
     }
 }
 
@@ -640,3 +628,66 @@ mod tests {
         );
     }
 }
+
+/*
+fn check_columns_contains_condition(columns: Vec<String>, query: Query) -> Result<Query, u32> {
+    // TODO
+    match get_where_columns(&query) {
+        Some(column) => {
+            if columns.contains(&column) {
+                Ok(query)
+            } else {
+                Err(error::ARCHIVO_NO_CONTIENE_COLUMNAS_SOLICITADAS)
+            }
+        }
+        None => Err(error::NO_WHERE),
+    }
+}
+
+fn get_where_columns(query: &Query) -> Option<String> {
+    match &query.where_condition {
+        Some(cond) => cond.column.as_ref().map(|col| col.to_string()),
+        None => None,
+    }
+}
+
+fn get_condition_node(query: &Query, args: &[String], counter: &mut usize) -> Result<ComplexCondition, u32> {
+    // Pre:  Query args and counter of args
+    // Post: New node && increments counter
+    let new_node: ComplexCondition;
+    if args[*counter].eq("AND") {
+        new_node = build_complex_condition(BooleanOperator::AND, None, None);
+        *counter += 1;
+    } else if args[*counter].eq("OR") {
+        new_node = build_complex_condition(BooleanOperator::OR, None, None);
+        *counter += 1;
+    } else if args[*counter].eq("NOT") {
+        new_node = build_complex_condition(BooleanOperator::NOT, None, None);
+        *counter += 1;
+    } else if *counter + 3 < args.len() {
+        match get_columns_position(query, &[args[*counter].to_string()]) {
+            Err(x) => return Err(x),
+            Ok(x) => {
+                let simple_condition: Condition = if args[*counter + 2].eq("<") {
+                    build_condition(x[0], args[*counter + 2].to_string(), ConditionOperator::Minor)
+                } else if args[*counter + 2].eq("<=") {
+                    build_condition(x[0], args[*counter + 2].to_string(), ConditionOperator::MinorEqual)
+                } else if args[*counter + 2].eq("=") {
+                    build_condition(x[0], args[*counter + 2].to_string(), ConditionOperator::Equal)
+                } else if args[*counter + 2].eq(">=") {
+                    build_condition(x[0], args[*counter + 2].to_string(), ConditionOperator::HigherEqual)
+                } else if args[*counter + 2].eq(">") {
+                    build_condition(x[0], args[*counter + 2].to_string(), ConditionOperator::Higher)
+                } else {
+                    return Err(WHERE_MAL_FORMATEADO)
+                };
+                new_node = build_simple_condition(Some(simple_condition));
+                *counter += 3;
+            }
+        }
+    } else {
+        return Err(WHERE_MAL_FORMATEADO)
+    }
+    Ok(new_node)
+}
+*/

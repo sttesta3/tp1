@@ -1,20 +1,25 @@
 pub mod condition_type;
-/*
-pub mod complex_condition;
-
-use crate::libs::error;
-use condition_type::BooleanOperator;
-*/
+// pub mod complex_condition;
+// use condition_type::BooleanOperator;
+// use crate::libs::error;
 
 use condition_type::ConditionOperator;
 
 pub struct Condition {
     pub condition: ConditionOperator,
-    pub column: Option<String>,
+    pub column: Option<usize>,
     pub value: Option<String>,
 }
 
-pub fn build_condition(column: String, value: String, cond: ConditionOperator) -> Condition {
+pub fn build_not_condition() -> Condition {
+    Condition {
+        condition: ConditionOperator::Equal,
+        column: None,
+        value: None,
+    }
+}
+
+pub fn build_condition(column: usize, value: String, cond: ConditionOperator) -> Condition {
     Condition {
         condition: cond,
         column: Some(column),
@@ -23,6 +28,8 @@ pub fn build_condition(column: String, value: String, cond: ConditionOperator) -
 }
 
 pub fn operate_condition(v1: &String, v2: &String, operator: &ConditionOperator) -> bool {
+    // Pre:  Strings and operator
+    // Post: Bool if condition applies or not ( operates string and int )
     if let Ok(x1) = v1.parse::<i32>() {
         if let Ok(x2) = v2.parse::<i32>() {
             match operator {
@@ -42,4 +49,53 @@ pub fn operate_condition(v1: &String, v2: &String, operator: &ConditionOperator)
         ConditionOperator::Higher => v1 > v2,
         ConditionOperator::HigherEqual => v1 >= v2,
     }
+}
+
+pub fn operate_full_condition(elements: &[String], condition: &[Vec<Condition>]) -> bool {
+    // Pre:  Line to vec and condition (bool vector).
+    // Post: Bool if condition applies or not
+
+    let mut or_valid = false;
+    let mut or_counter = 0;
+
+    let mut and_valid;
+    let mut and_counter;
+    let mut not_detected;
+
+    while or_counter < condition.len() && !or_valid {
+        and_valid = true;
+        and_counter = 0;
+        not_detected = false;
+        while and_counter < condition[or_counter].len() && and_valid {
+            match &condition[or_counter][and_counter].column {
+                None => not_detected = !not_detected,
+                Some(column) => match &condition[or_counter][and_counter].value {
+                    None => return false,
+                    Some(value) => {
+                        if not_detected {
+                            and_valid = !operate_condition(
+                                &elements[*column],
+                                value,
+                                &condition[or_counter][and_counter].condition,
+                            )
+                        } else {
+                            and_valid = operate_condition(
+                                &elements[*column],
+                                value,
+                                &condition[or_counter][and_counter].condition,
+                            );
+                        }
+                    }
+                },
+            }
+
+            and_counter += 1;
+        }
+
+        or_valid = and_valid;
+
+        or_counter += 1;
+    }
+
+    or_valid
 }
