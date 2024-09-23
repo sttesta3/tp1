@@ -3,15 +3,15 @@ use std::io::{BufRead, BufReader};
 
 use crate::condition::{build_not_condition, build_condition, Condition};
 //use crate::condition::complex_condition::{add_node_to_tree, build_complex_condition, build_simple_condition, ComplexCondition, tree_check, check_precedence};
-use crate::condition::condition_type::{BooleanOperator, ConditionOperator};
+use crate::condition::condition_type::ConditionOperator;
 //use crate::condition::{add_node_to_tree, build_complex_condition, build_condition, build_empty_complex_condition, get_where_columns, tree_check, ComplexCondition, Condition};
 // use crate::condition::Condition;
 use crate::libs::error;
-use crate::query::{self, build_empty_query};
+use crate::query::build_empty_query;
 use crate::query::query_type::QueryType;
 use crate::query::{Query, DELETE_MIN_LEN, INSERT_MIN_LEN, SELECT_MIN_LEN, UPDATE_MIN_LEN};
 
-use super::error::{DELETE_MAL_FORMATEADO, SELECT_MAL_FORMATEADO, WHERE_MAL_FORMATEADO};
+use super::error::{DELETE_MAL_FORMATEADO, WHERE_MAL_FORMATEADO};
 
 pub fn build_query(text_query: &String, path: &String) -> Result<Query, u32> {
     // Full "Compilation" process of query. Tokenization, sintactic analysis, semantic and build

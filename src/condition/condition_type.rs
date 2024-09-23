@@ -13,9 +13,11 @@ pub enum BooleanOperator {
     I       // identity.    
 }
 
+/* 
 impl PartialEq for BooleanOperator {
     fn eq(&self, other: &Self) -> bool {
         self == other
     }
 }
 impl Eq for BooleanOperator {}
+*/
