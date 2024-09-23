@@ -3,15 +3,13 @@ pub mod query_type;
 use query_type::QueryType;
 
 use crate::condition::Condition;
-//use crate::complex_condition::ComplexCondition,
-
-// use crate::condition::ComplexCondition;
 
 pub static DELETE_MIN_LEN: usize = 7; // DELETE FROM tabla WHERE a < b
 pub static INSERT_MIN_LEN: usize = 6; // INSERT INTO tabla col VALUES val
 pub static SELECT_MIN_LEN: usize = 4; // SELECT * FROM tabla
 pub static UPDATE_MIN_LEN: usize = 10; // UPDATE tabla SET col = valor WHERE a < b
 
+/// Represents a SQL query 
 pub struct Query {
     pub operation: Option<QueryType>, // DELETE, INSERT, SELECT, UPDATE
     pub table: Option<String>,        // DELETE, INSERT, SELECT, UPDATE

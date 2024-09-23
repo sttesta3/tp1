@@ -13,8 +13,8 @@ use crate::query::{Query, DELETE_MIN_LEN, INSERT_MIN_LEN, SELECT_MIN_LEN, UPDATE
 
 use super::error::{DELETE_MAL_FORMATEADO, WHERE_MAL_FORMATEADO};
 
+/// Build query for execution
 pub fn build_query(text_query: &String, path: &String) -> Result<Query, u32> {
-    // Full "Compilation" process of query. Tokenization, sintactic analysis, semantic and build
     let args = text_to_vec(text_query, false);
     match vec_to_query(&args, path) {
         Ok(x) => validate_query(x),
@@ -22,6 +22,12 @@ pub fn build_query(text_query: &String, path: &String) -> Result<Query, u32> {
     }
 }
 
+/// Merge table and path. Aux funcion
+/// 
+/// ```
+/// let result = merge_table_and_path(String::from("tablas"), "clientes.csv");
+/// assert!(result,String::from("tablas/clientes.csv"));
+/// ```
 fn merge_table_and_path(path: &String, table: &str) -> String {
     let mut table_full: String = path.to_string();
     table_full.push('/');
@@ -31,7 +37,8 @@ fn merge_table_and_path(path: &String, table: &str) -> String {
     table_full
 }
 
-fn separate_args_delete(args: &[String], path: &String, result: &mut Query) -> Result<u32, u32> {
+/// Parse args from vec to query (special case for delete)
+fn parse_args_delete(args: &[String], path: &String, result: &mut Query) -> Result<u32, u32> {
     if args.len() < DELETE_MIN_LEN {
         Err(error::DELETE_MAL_FORMATEADO)
     } else {
@@ -56,7 +63,8 @@ fn separate_args_delete(args: &[String], path: &String, result: &mut Query) -> R
     }
 }
 
-fn separate_args_insert(args: &[String], path: &String, result: &mut Query) -> Result<u32, u32> {
+/// Parse args from vec to query (special case for insert)
+fn parse_args_insert(args: &[String], path: &String, result: &mut Query) -> Result<u32, u32> {
     if args.len() < INSERT_MIN_LEN {
         Err(error::INSERT_MAL_FORMATEADO)
     } else {
@@ -89,7 +97,8 @@ fn separate_args_insert(args: &[String], path: &String, result: &mut Query) -> R
     }
 }
 
-fn separate_args_update(args: &[String], path: &String, result: &mut Query) -> Result<u32, u32> {
+/// Parse args from vec to query (special case for update)
+fn parse_args_update(args: &[String], path: &String, result: &mut Query) -> Result<u32, u32> {
     if args.len() < UPDATE_MIN_LEN {
         Err(error::UPDATE_MAL_FORMATEADO)
     } else {
@@ -126,7 +135,8 @@ fn separate_args_update(args: &[String], path: &String, result: &mut Query) -> R
     }
 }
 
-fn separate_args_select(args: &[String], path: &String, result: &mut Query) -> Result<u32, u32> {
+/// Parse args from vec to query (special case for select)
+fn parse_args_select(args: &[String], path: &String, result: &mut Query) -> Result<u32, u32> {
     if args.len() < SELECT_MIN_LEN {
         Err(error::SELECT_MAL_FORMATEADO)
     } else {
@@ -188,8 +198,9 @@ fn separate_args_select(args: &[String], path: &String, result: &mut Query) -> R
     }
 }
 
+/// Aux Function. parse from string columns to the index of the columns in the table
+/// All columns should be in the table  
 fn get_columns_position(query: &Query, string_cols: &[String]) -> Result<Vec<usize>, u32> {
-    // From string
     match get_file_first_line(query) {
         Some(line) => {
             let mut result: Vec<usize> = Vec::new();
@@ -215,13 +226,19 @@ fn get_columns_position(query: &Query, string_cols: &[String]) -> Result<Vec<usi
     }
 }
 
+/// Parse boolean where condition, advancing the counter 
+///
+/// Pre:  Query args and counter in next position to WHERE
+/// Post: Complex condition for query and counter at the next position of the last element of condition
+/// 
+/// EXAMPLE:
+/// Pre:  parse_where_condition(query, vec!["SELECT","*","FROM","tabla","WHERE","id","<","5","ORDER","BY","id"],5);
+/// Post: Result<parsed_condition>, counter =  8
 fn parse_where_condition(
     query: &Query,
     args: &[String],
     counter: &mut usize,
 ) -> Result<Vec<Vec<Condition>>, u32> {
-    // Pre: Query args and counter
-    // Post: Complex condition for query
     if args[*counter].eq("AND") || args[*counter].eq("OR") {
         Err(WHERE_MAL_FORMATEADO)
     } else {
@@ -244,6 +261,8 @@ fn parse_where_condition(
     }
 }
 
+/// Pre: Query, args, position counter and wip vector 
+/// Post: Parses the next simple condition into boolean vector
 fn parse_next_condition(
     query: &Query,
     args: &[String],
@@ -310,9 +329,9 @@ fn parse_next_condition(
     Ok(0)
 }
 
+// Pre: Boolean vector (parsed boolean condition)
+// Post: Bool for valid or invalid result
 fn check_valid_bool(boolean_expresion: &[Vec<Condition>]) -> bool {
-    // Pre: Boolean vector
-    // Post: Bool for valid or invalid
     let mut valid = true;
     let mut counter = 0;
     let mut sub_counter;
@@ -333,6 +352,8 @@ fn check_valid_bool(boolean_expresion: &[Vec<Condition>]) -> bool {
     valid
 }
 
+
+/// find column position
 fn find_column_position(column_name: &String, columns: &[String]) -> Result<usize, u32> {
     let mut counter = 0;
     while counter < columns.len() {
@@ -345,8 +366,8 @@ fn find_column_position(column_name: &String, columns: &[String]) -> Result<usiz
     Err(error::ARCHIVO_NO_CONTIENE_COLUMNAS_SOLICITADAS)
 }
 
+/// Check correct operation sintaxis
 fn check_operation_format(args: &[String]) -> Result<QueryType, u32> {
-    // Check correct operation sintaxis
     let operation = &args[0];
     if operation.eq("DELETE") {
         check_delete_format(args)
@@ -361,6 +382,7 @@ fn check_operation_format(args: &[String]) -> Result<QueryType, u32> {
     }
 }
 
+/// Check correct operation sintaxis (special case for delete)
 fn check_delete_format(args: &[String]) -> Result<QueryType, u32> {
     let non_valid_keywords = vec![
         "INSERT", "INTO", "VALUES", "SELECT", "ORDER", "BY", "UPDATE", "SET",
@@ -375,6 +397,7 @@ fn check_delete_format(args: &[String]) -> Result<QueryType, u32> {
     }
 }
 
+/// Check correct operation sintaxis (special case for insert)
 fn check_insert_format(args: &[String]) -> Result<QueryType, u32> {
     let non_valid_keywords = vec![
         "DELETE", "FROM", "SELECT", "ORDER", "BY", "UPDATE", "SET", "WHERE", "AND", "OR", "NOT",
@@ -400,6 +423,7 @@ fn check_insert_format(args: &[String]) -> Result<QueryType, u32> {
     }
 }
 
+/// Check correct operation sintaxis (special case for select)
 fn check_select_format(args: &[String]) -> Result<QueryType, u32> {
     let non_valid_keywords = vec!["DELETE", "INSERT", "INTO", "VALUES", "UPDATE", "SET"];
     if check_non_valid_keywords(args, non_valid_keywords) {
@@ -410,6 +434,7 @@ fn check_select_format(args: &[String]) -> Result<QueryType, u32> {
     }
 }
 
+/// Check correct operation sintaxis (special case for update)
 fn check_update_format(args: &[String]) -> Result<QueryType, u32> {
     let non_valid_keywords = vec![
         "DELETE", "FROM", "INSERT", "INTO", "SELECT", "VALUES", "ORDER", "BY",
@@ -424,8 +449,8 @@ fn check_update_format(args: &[String]) -> Result<QueryType, u32> {
     }
 }
 
+/// Check if args for query contains non valid keywords
 fn check_non_valid_keywords(args: &[String], non_valid_keywords: Vec<&str>) -> bool {
-    // Checks if args contains any non valid keyword
     let mut result = true;
     let mut counter = 0;
 
@@ -440,9 +465,9 @@ fn check_non_valid_keywords(args: &[String], non_valid_keywords: Vec<&str>) -> b
     result
 }
 
+/// Pre: Sintactical query OK
+/// Post: Valid query for execution
 fn validate_query(query: Query) -> Result<Query, u32> {
-    // Pre: Sintactical query OK
-    // Post: Valid query for execution
     match &query.table {
         Some(table) => match File::open(table) {
             Ok(_) => {}
@@ -462,6 +487,7 @@ fn validate_query(query: Query) -> Result<Query, u32> {
     }
 }
 
+/// Validate query: Special case for delete
 fn validate_delete_query(query: Query) -> Result<Query, u32> {
     if query.columns.is_none() && query.values.is_none() && query.where_condition.is_some() {
         match &query.table {
@@ -479,21 +505,25 @@ fn validate_delete_query(query: Query) -> Result<Query, u32> {
     }
 }
 
+/// Validate query: Special case for insert
 fn validate_insert_query(query: Query) -> Result<Query, u32> {
     // TODO
     Ok(query)
 }
 
+/// Validate query: Special case for select
 fn validate_select_query(query: Query) -> Result<Query, u32> {
     // TODO
     Ok(query)
 }
 
+/// Validate query: Special case for update
 fn validate_update_query(query: Query) -> Result<Query, u32> {
     // TODO
     Ok(query)
 }
 
+/// AUX: Get columns from file
 fn get_columns(file: File) -> Option<Vec<String>> {
     let mut result: Vec<String> = Vec::new();
     let mut reader: BufReader<File> = BufReader::new(file);
@@ -516,9 +546,10 @@ fn get_columns(file: File) -> Option<Vec<String>> {
     }
 }
 
+/// AUX: Get first line from file
+/// Pre: query
+/// Post: File first line, if any
 pub fn get_file_first_line(query: &Query) -> Option<String> {
-    // Pre: query
-    // Post: File first line, if any
     match &query.table {
         Some(table) => match File::open(table) {
             Ok(f) => {
@@ -539,8 +570,8 @@ pub fn get_file_first_line(query: &Query) -> Option<String> {
     }
 }
 
+/// Tokenization of text query by space, new line & coma
 pub fn text_to_vec(text_query: &String, coma: bool) -> Vec<String> {
-    // Text to vector. Tokenization by space, new line & coma
     let mut tmp_text_query = text_query.to_string();
     tmp_text_query = tmp_text_query.replace('\n', " ");
     if !coma {
@@ -566,25 +597,26 @@ pub fn text_to_vec(text_query: &String, coma: bool) -> Vec<String> {
     result
 }
 
+/// Parses vector of tokens into query
+/// Pre:  Vec of tokens from query & path to tables
+/// Post: Vec to non validated query
 fn vec_to_query(args: &[String], path: &String) -> Result<Query, u32> {
-    // Pre:  Vec of queries tokens & path to tables
-    // Post: Vec to non validated query
     let mut result: Query = build_empty_query();
     match check_operation_format(args) {
         Ok(x) => match &x {
-            QueryType::DELETE => match separate_args_delete(args, path, &mut result) {
+            QueryType::DELETE => match parse_args_delete(args, path, &mut result) {
                 Ok(_) => result.operation = Some(x),
                 Err(x) => return Err(x),
             },
-            QueryType::INSERT => match separate_args_insert(args, path, &mut result) {
+            QueryType::INSERT => match parse_args_insert(args, path, &mut result) {
                 Ok(_) => result.operation = Some(x),
                 Err(x) => return Err(x),
             },
-            QueryType::SELECT => match separate_args_select(args, path, &mut result) {
+            QueryType::SELECT => match parse_args_select(args, path, &mut result) {
                 Ok(_) => result.operation = Some(x),
                 Err(x) => return Err(x),
             },
-            QueryType::UPDATE => match separate_args_update(args, path, &mut result) {
+            QueryType::UPDATE => match parse_args_update(args, path, &mut result) {
                 Ok(_) => result.operation = Some(x),
                 Err(x) => return Err(x),
             },

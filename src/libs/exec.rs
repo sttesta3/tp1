@@ -11,6 +11,8 @@ use super::parsing::{self, get_file_first_line, text_to_vec};
 
 static FILE_SORT_BUFFER: usize = 3;
 
+/// Main execution function, execs query
+/// By definition, if something is wrong with the query, then it should do nothing
 pub fn exec_query(query: Query) {
     if let Some(op) = &query.operation {
         match op {
@@ -22,6 +24,7 @@ pub fn exec_query(query: Query) {
     }
 }
 
+/// Exec query: Special case for delete
 fn exec_query_delete(query: Query) {
     if let Some(cond) = &query.where_condition {
         if let Some(table) = &query.table {
@@ -68,6 +71,7 @@ fn exec_query_delete(query: Query) {
     }
 }
 
+/// Exec query: Special case for insert
 fn exec_query_insert(query: Query) {
     if let Some(table) = &query.table {
         if let Some(write_columns) = &query.columns {
@@ -102,6 +106,7 @@ fn exec_query_insert(query: Query) {
     }
 }
 
+/// Exec query: Special case for select
 fn exec_query_select(query: Query) {
     match &query.order_by {
         Some((column, asc)) => {
@@ -120,15 +125,18 @@ fn exec_query_select(query: Query) {
     }
 }
 
+/// Cleans tmp files
+/// Pre: filenames
+/// Post: Cleans files 
 fn file_cleanup(files: &Vec<String>) {
     for file in files {
         let _ = remove_file(file);
     }
 }
 
+/// Pre: Name of tmp_files, column for ordering and selector of asc/desc
+/// Post: Prints from tmp_files in order
 fn print_sorted_files(files: &[String], col_index: &usize, asc: &bool) {
-    // Pre: Name of tmp_files, column for ordering and selector of asc/desc
-    // Post: Prints from tmp_files in order
     if let Some(mut readers) = create_readers(files) {
         if let Some(mut lines_buffer) = readers_read_first_line(&mut readers) {
             // While there are lines to be printed
@@ -152,15 +160,15 @@ fn print_sorted_files(files: &[String], col_index: &usize, asc: &bool) {
     }
 }
 
+/// Gets next sorted line from mem's buffer and replace it with the next line on that file
+/// Pre: Lines buffer, readers, col index for sorting and ascending/descending bool
+/// Post: Next line, if not fully read
 fn get_next_line(
     lines_buffer: &mut Vec<Vec<String>>,
     readers: &mut [BufReader<File>],
     col_index: usize,
     asc: &bool,
 ) -> Option<Vec<String>> {
-    // Pre: Lines buffer, readers, col index for sorting and ascending/descending bool
-    // Post: Next line, if not fully read
-
     let mut line = String::new();
     match find_next_line(lines_buffer, col_index, asc) {
         Some(reader_index) => match &readers[reader_index].read_line(&mut line) {
@@ -184,10 +192,10 @@ fn get_next_line(
     }
 }
 
+/// Find next sorted line's index to be printed
+/// Pre: Lines buffer, col index and ascending/descending
+/// Post: Index of next line, if any
 fn find_next_line(lines_buffer: &mut [Vec<String>], col_index: usize, asc: &bool) -> Option<usize> {
-    // Pre: Lines buffer, col index and ascending/descending
-    // Post: Index of next line, if any
-
     // Find first line
     let mut candidate = 0;
     while candidate < lines_buffer.len() && lines_buffer[candidate].is_empty() {
@@ -224,6 +232,9 @@ fn find_next_line(lines_buffer: &mut [Vec<String>], col_index: usize, asc: &bool
     }
 }
 
+/// Read first line from all files 
+/// Pre: Lines buffer, col index and ascending/descending
+/// Post: Index of next line, if any
 fn readers_read_first_line(readers: &mut Vec<BufReader<File>>) -> Option<Vec<Vec<String>>> {
     let mut result: Vec<Vec<String>> = Vec::new();
     let mut line = String::new();
@@ -241,6 +252,9 @@ fn readers_read_first_line(readers: &mut Vec<BufReader<File>>) -> Option<Vec<Vec
     Some(result)
 }
 
+/// Create readers for reading files  
+/// Pre: Filenames  
+/// Post: File's readers
 fn create_readers(files: &[String]) -> Option<Vec<BufReader<File>>> {
     let mut valid = true;
     let mut readers: Vec<BufReader<File>> = Vec::new();
@@ -262,9 +276,6 @@ fn create_readers(files: &[String]) -> Option<Vec<BufReader<File>>> {
         None
     }
 }
-
-/*
-*/
 
 fn exec_query_update(query: Query) {
     if let Some(cond) = &query.where_condition {
@@ -706,10 +717,9 @@ fn find_insert_position(
     }
 }
 
+/// Pre: Columns vector sorted && Elements of line content vector
+/// Post: print to stdout the correct columns
 fn print_file_unconditional(columns_opt: &Option<Vec<usize>>, elements: &[String]) {
-    // Pre: Columns vector sorted incremental && Elements of line content vector
-    // Post: print to stdout the correct columns
-
     match columns_opt {
         Some(columns) => {
             // SELECT columns FROM
@@ -750,6 +760,7 @@ fn print_file_conditioned(
     }
 }
 
+/// Aux function. Tokenizer for special cases
 fn line_to_vec(line: &str) -> Vec<String> {
     let mut result: Vec<String> = Vec::new();
     let mut split = line.split(',');

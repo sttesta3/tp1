@@ -11,6 +11,7 @@ pub struct Condition {
     pub value: Option<String>,
 }
 
+/// Constructor for not condition 
 pub fn build_not_condition() -> Condition {
     Condition {
         condition: ConditionOperator::Equal,
@@ -19,6 +20,7 @@ pub fn build_not_condition() -> Condition {
     }
 }
 
+/// Constructor for general condition (simple expression, non boolean) 
 pub fn build_condition(column: usize, value: String, cond: ConditionOperator) -> Condition {
     Condition {
         condition: cond,
@@ -27,9 +29,11 @@ pub fn build_condition(column: usize, value: String, cond: ConditionOperator) ->
     }
 }
 
+/// Returns string (or int if it's parseable as int) comparison
+/// 
+/// Pre:  Strings and operator
+/// Post: True if condition applies 
 pub fn operate_condition(v1: &String, v2: &String, operator: &ConditionOperator) -> bool {
-    // Pre:  Strings and operator
-    // Post: Bool if condition applies or not ( operates string and int )
     if let Ok(x1) = v1.parse::<i32>() {
         if let Ok(x2) = v2.parse::<i32>() {
             match operator {
@@ -51,9 +55,11 @@ pub fn operate_condition(v1: &String, v2: &String, operator: &ConditionOperator)
     }
 }
 
+/// Returns the result of applying the condition to the lineW
+/// 
+/// Pre:  Line to vec and condition (bool vector).
+/// Post: Bool if condition applies or not
 pub fn operate_full_condition(elements: &[String], condition: &[Vec<Condition>]) -> bool {
-    // Pre:  Line to vec and condition (bool vector).
-    // Post: Bool if condition applies or not
 
     let mut or_valid = false;
     let mut or_counter = 0;
