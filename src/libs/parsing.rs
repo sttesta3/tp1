@@ -1,7 +1,7 @@
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
-use crate::condition::{build_not_condition, build_condition, Condition};
+use crate::condition::{build_condition, build_not_condition, Condition};
 //use crate::condition::complex_condition::{add_node_to_tree, build_complex_condition, build_simple_condition, ComplexCondition, tree_check, check_precedence};
 use crate::condition::condition_type::ConditionOperator;
 //use crate::condition::{add_node_to_tree, build_complex_condition, build_condition, build_empty_complex_condition, get_where_columns, tree_check, ComplexCondition, Condition};
@@ -44,14 +44,14 @@ fn separate_args_delete(args: &[String], path: &String, result: &mut Query) -> R
             return Err(error::DELETE_MAL_FORMATEADO);
         } else if args[3].eq("WHERE") {
             let mut counter: usize = 4;
-            match parse_where_condition(&result, args, &mut counter) {
+            match parse_where_condition(result, args, &mut counter) {
                 Ok(cond) => result.where_condition = Some(cond),
-                Err(x) => return Err(x)
-            }        
-        } else{
+                Err(x) => return Err(x),
+            }
+        } else {
             return Err(DELETE_MAL_FORMATEADO);
         }
-        
+
         Ok(0)
     }
 }
@@ -117,9 +117,9 @@ fn separate_args_update(args: &[String], path: &String, result: &mut Query) -> R
         }
         result.values = Some(values);
 
-        match parse_where_condition(&result, args, &mut counter) {
+        match parse_where_condition(result, args, &mut counter) {
             Ok(cond) => result.where_condition = Some(cond),
-            Err(x) => return Err(x)
+            Err(x) => return Err(x),
         }
 
         Ok(0)
@@ -156,9 +156,9 @@ fn separate_args_select(args: &[String], path: &String, result: &mut Query) -> R
             Ok(0)
         } else if args[counter].eq("WHERE") {
             counter += 1;
-            match parse_where_condition(&result, args, &mut counter) {
+            match parse_where_condition(result, args, &mut counter) {
                 Ok(cond) => result.where_condition = Some(cond),
-                Err(x) => return Err(x)
+                Err(x) => return Err(x),
             }
 
             if counter < args.len() {
@@ -182,8 +182,7 @@ fn separate_args_select(args: &[String], path: &String, result: &mut Query) -> R
                 }
             }
             Ok(0)
-        }
-        else {
+        } else {
             Err(WHERE_MAL_FORMATEADO)
         }
     }
@@ -216,86 +215,102 @@ fn get_columns_position(query: &Query, string_cols: &[String]) -> Result<Vec<usi
     }
 }
 
-fn parse_where_condition(query: &Query, args: &[String], counter: &mut usize) -> Result<Vec<Vec<Condition>>,u32> {
+fn parse_where_condition(
+    query: &Query,
+    args: &[String],
+    counter: &mut usize,
+) -> Result<Vec<Vec<Condition>>, u32> {
     // Pre: Query args and counter
-    // Post: Complex condition for query 
+    // Post: Complex condition for query
     if args[*counter].eq("AND") || args[*counter].eq("OR") {
-        Err(WHERE_MAL_FORMATEADO)    
+        Err(WHERE_MAL_FORMATEADO)
     } else {
-        // Parse into boolean vector 
+        // Parse into boolean vector
         let mut result: Vec<Vec<Condition>> = Vec::new();
         result.push(Vec::new());
-        while *counter < args.len() && ! args[*counter].eq("ORDER") {
+        while *counter < args.len() && !args[*counter].eq("ORDER") {
             match parse_next_condition(query, args, counter, &mut result) {
                 Ok(_) => continue,
-                Err(x) => return Err(x)
+                Err(x) => return Err(x),
             }
         }
 
-        // Check valid result 
-        if check_valid_bool(&result){
+        // Check valid result
+        if check_valid_bool(&result) {
             Ok(result)
         } else {
-            Err(WHERE_MAL_FORMATEADO)            
+            Err(WHERE_MAL_FORMATEADO)
         }
     }
 }
 
-fn parse_next_condition(query: &Query, args: &[String], counter: &mut usize, vec: &mut Vec<Vec<Condition>> ) -> Result<u32,u32> {
-    if args[*counter].eq("OR") {
-        if ! *counter + 2 < args.len() {
-            return Err(WHERE_MAL_FORMATEADO);
-        } else if args[*counter + 1].eq("AND") || args[*counter + 1].eq("OR") {
-            return Err(WHERE_MAL_FORMATEADO);
-        } 
+fn parse_next_condition(
+    query: &Query,
+    args: &[String],
+    counter: &mut usize,
+    vec: &mut Vec<Vec<Condition>>,
+) -> Result<u32, u32> {
+    if !*counter + 2 < args.len() {
+        return Err(WHERE_MAL_FORMATEADO);
+    } else if args[*counter + 1].eq("AND") || args[*counter + 1].eq("OR") {
+        return Err(WHERE_MAL_FORMATEADO);
+    } else if args[*counter].eq("OR") {
         vec.push(Vec::new());
         *counter += 1;
     } else if args[*counter].eq("AND") {
-        if ! *counter + 2 < args.len() {
-            return Err(WHERE_MAL_FORMATEADO);
-        } else if args[*counter + 1].eq("AND") || args[*counter + 1].eq("OR") {
-            return Err(WHERE_MAL_FORMATEADO);
-        } 
         *counter += 1;
     } else if args[*counter].eq("NOT") {
-        if ! *counter + 2 < args.len() {
-            return Err(WHERE_MAL_FORMATEADO);
-        } else if args[*counter + 1].eq("AND") || args[*counter + 1].eq("OR") {
-            return Err(WHERE_MAL_FORMATEADO);
-        } 
         let position = vec.len() - 1;
-        vec[position].push(build_not_condition()); // String vacio 
+        vec[position].push(build_not_condition()); // String vacio
         *counter += 1;
-    } else if *counter + 2 < args.len() {
+    } else {
         match get_columns_position(query, &[args[*counter].to_string()]) {
             Err(x) => return Err(x),
             Ok(x) => {
                 let simple_condition: Condition = if args[*counter + 1].eq("<") {
-                    build_condition(x[0], args[*counter + 2].to_string(), ConditionOperator::Minor)
+                    build_condition(
+                        x[0],
+                        args[*counter + 2].to_string(),
+                        ConditionOperator::Minor,
+                    )
                 } else if args[*counter + 1].eq("<=") {
-                    build_condition(x[0], args[*counter + 2].to_string(), ConditionOperator::MinorEqual)
+                    build_condition(
+                        x[0],
+                        args[*counter + 2].to_string(),
+                        ConditionOperator::MinorEqual,
+                    )
                 } else if args[*counter + 1].eq("=") {
-                    build_condition(x[0], args[*counter + 2].to_string(), ConditionOperator::Equal)
+                    build_condition(
+                        x[0],
+                        args[*counter + 2].to_string(),
+                        ConditionOperator::Equal,
+                    )
                 } else if args[*counter + 1].eq(">=") {
-                    build_condition(x[0], args[*counter + 2].to_string(), ConditionOperator::HigherEqual)
+                    build_condition(
+                        x[0],
+                        args[*counter + 2].to_string(),
+                        ConditionOperator::HigherEqual,
+                    )
                 } else if args[*counter + 1].eq(">") {
-                    build_condition(x[0], args[*counter + 2].to_string(), ConditionOperator::Higher)
+                    build_condition(
+                        x[0],
+                        args[*counter + 2].to_string(),
+                        ConditionOperator::Higher,
+                    )
                 } else {
-                    return Err(WHERE_MAL_FORMATEADO)                            
+                    return Err(WHERE_MAL_FORMATEADO);
                 };
                 let position = vec.len() - 1;
                 vec[position].push(simple_condition);
                 *counter += 3;
             }
         }
-    } else {
-        return Err(WHERE_MAL_FORMATEADO)
     }
 
     Ok(0)
 }
 
-fn check_valid_bool(boolean_expresion: &Vec<Vec<Condition>>) -> bool {
+fn check_valid_bool(boolean_expresion: &[Vec<Condition>]) -> bool {
     // Pre: Boolean vector
     // Post: Bool for valid or invalid
     let mut valid = true;
@@ -307,12 +322,12 @@ fn check_valid_bool(boolean_expresion: &Vec<Vec<Condition>>) -> bool {
 
         sub_counter = 0;
         while sub_counter < boolean_expresion[counter].len() && valid {
-            open_not = ! ( open_not && boolean_expresion[counter][sub_counter].value.is_some() );
+            open_not = !(open_not && boolean_expresion[counter][sub_counter].value.is_some());
             sub_counter += 1;
-        }  
+        }
 
-        valid = ! open_not;
-        counter += 1;        
+        valid = !open_not;
+        counter += 1;
     }
 
     valid
@@ -614,7 +629,7 @@ mod tests {
     }
 }
 
-/* 
+/*
 fn check_columns_contains_condition(columns: Vec<String>, query: Query) -> Result<Query, u32> {
     // TODO
     match get_where_columns(&query) {
@@ -644,10 +659,10 @@ fn get_condition_node(query: &Query, args: &[String], counter: &mut usize) -> Re
         new_node = build_complex_condition(BooleanOperator::AND, None, None);
         *counter += 1;
     } else if args[*counter].eq("OR") {
-        new_node = build_complex_condition(BooleanOperator::OR, None, None);               
+        new_node = build_complex_condition(BooleanOperator::OR, None, None);
         *counter += 1;
     } else if args[*counter].eq("NOT") {
-        new_node = build_complex_condition(BooleanOperator::NOT, None, None);     
+        new_node = build_complex_condition(BooleanOperator::NOT, None, None);
         *counter += 1;
     } else if *counter + 3 < args.len() {
         match get_columns_position(query, &[args[*counter].to_string()]) {
@@ -664,7 +679,7 @@ fn get_condition_node(query: &Query, args: &[String], counter: &mut usize) -> Re
                 } else if args[*counter + 2].eq(">") {
                     build_condition(x[0], args[*counter + 2].to_string(), ConditionOperator::Higher)
                 } else {
-                    return Err(WHERE_MAL_FORMATEADO)                            
+                    return Err(WHERE_MAL_FORMATEADO)
                 };
                 new_node = build_simple_condition(Some(simple_condition));
                 *counter += 3;

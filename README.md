@@ -31,4 +31,3 @@ Esta implementación tiene como problema que un query con el condicional WHERE A
 Para la lógica booleana tambien se considero un arbol binario de expresiones booleanas (https://en.wikipedia.org/wiki/Binary_expression_tree). No se logró implementar debido a problemas con el manejo de memoria en Rust, aunque en mi opinión creo que es la mejor implementación posible.  
 
 Para en ORDER BY no cargar las tablas completas en memoria se eligió "Full external sort" (https://cs186berkeley.net/notes/note8/)
-

@@ -33,7 +33,7 @@ fn exec_query_delete(query: Query) {
                     Ok(mut tmp_file) => {
                         let mut reader: BufReader<File> = BufReader::new(file);
                         let mut line = String::new();
-                        
+
                         let mut read = true;
                         while read {
                             if let Ok(x) = reader.read_line(&mut line) {
@@ -41,10 +41,7 @@ fn exec_query_delete(query: Query) {
                                 read = x != 0;
                                 if read {
                                     let elements = line_to_vec(&line);
-                                    if !operate_full_condition(
-                                        &elements,
-                                        cond
-                                    ) {
+                                    if !operate_full_condition(&elements, cond) {
                                         line.push('\n');
                                         if let Err(_error) = tmp_file.write(line.as_bytes()) {
                                             read = false;
@@ -63,7 +60,7 @@ fn exec_query_delete(query: Query) {
                 },
                 Err(_) => valid_operation = false,
             }
-            
+
             if remove_old_file(table, &tmp_file_name, valid_operation).is_err() {
                 println!("Error en manipulación de archivos");
             }
@@ -117,7 +114,7 @@ fn exec_query_select(query: Query) {
             }
         }
         None => {
-//            let col_index: i32 = find_filter_column(&query);
+            //            let col_index: i32 = find_filter_column(&query);
             read_and_print_file(&query);
         }
     }
@@ -271,65 +268,61 @@ fn create_readers(files: &[String]) -> Option<Vec<BufReader<File>>> {
 
 fn exec_query_update(query: Query) {
     if let Some(cond) = &query.where_condition {
-            if let Some(columns) = &query.columns {
-                if let Some(values) = &query.values {
-                    if let Some(table) = &query.table {
-                        let tmp_file = get_tmp_file_name(table);
-                        let mut valid_operation = true;
-                        match File::open(table) {
-                            Ok(file) => match File::create(&tmp_file) {
-                                Ok(mut tmp_file) => {
-                                    let mut reader: BufReader<File> = BufReader::new(file);
-                                    let mut line = String::new();
+        if let Some(columns) = &query.columns {
+            if let Some(values) = &query.values {
+                if let Some(table) = &query.table {
+                    let tmp_file = get_tmp_file_name(table);
+                    let mut valid_operation = true;
+                    match File::open(table) {
+                        Ok(file) => match File::create(&tmp_file) {
+                            Ok(mut tmp_file) => {
+                                let mut reader: BufReader<File> = BufReader::new(file);
+                                let mut line = String::new();
 
-                                    let mut read = true;
-                                    while read {
-                                        if let Ok(x) = reader.read_line(&mut line) {
-                                            read = x != 0;
-                                            if read {
-                                                line = line.replace('\n', "");
-                                                let elements = line_to_vec(&line);
-                                                if !operate_full_condition(
-                                                    &elements,
-                                                    cond
+                                let mut read = true;
+                                while read {
+                                    if let Ok(x) = reader.read_line(&mut line) {
+                                        read = x != 0;
+                                        if read {
+                                            line = line.replace('\n', "");
+                                            let elements = line_to_vec(&line);
+                                            if !operate_full_condition(&elements, cond) {
+                                                // Line not updated
+                                                line.push('\n');
+                                                if let Err(_error) = tmp_file.write(line.as_bytes())
+                                                {
+                                                    read = false;
+                                                    valid_operation = false;
+                                                }
+                                            } else {
+                                                // Update Line
+                                                if let Err(_error) = tmp_file.write(
+                                                    update_line(&elements, columns, values)
+                                                        .as_bytes(),
                                                 ) {
-                                                    // Line not updated
-                                                    line.push('\n');
-                                                    if let Err(_error) =
-                                                        tmp_file.write(line.as_bytes())
-                                                    {
-                                                        read = false;
-                                                        valid_operation = false;
-                                                    }
-                                                } else {
-                                                    // Update Line
-                                                    if let Err(_error) = tmp_file.write(
-                                                        update_line(&elements, columns, values)
-                                                            .as_bytes(),
-                                                    ) {
-                                                        read = false;
-                                                        valid_operation = false;
-                                                    }
+                                                    read = false;
+                                                    valid_operation = false;
                                                 }
                                             }
-                                            line.clear();
-                                        } else {
-                                            read = false;
-                                            valid_operation = false;
                                         }
+                                        line.clear();
+                                    } else {
+                                        read = false;
+                                        valid_operation = false;
                                     }
                                 }
-                                Err(_) => valid_operation = false,
-                            },
+                            }
                             Err(_) => valid_operation = false,
-                        }
+                        },
+                        Err(_) => valid_operation = false,
+                    }
 
-                        if remove_old_file(table, &tmp_file, valid_operation).is_err() {
-                            println!("Error en manipulación de archivos");
-                        }
+                    if remove_old_file(table, &tmp_file, valid_operation).is_err() {
+                        println!("Error en manipulación de archivos");
                     }
                 }
             }
+        }
     }
 }
 
@@ -468,11 +461,9 @@ fn read_and_print_file(query: &Query) {
                     if read {
                         let elements = line_to_vec(&line);
                         match &query.where_condition {
-                            Some(condition) => print_file_conditioned(
-                                &query.columns,
-                                &condition,
-                                &elements,
-                            ),
+                            Some(condition) => {
+                                print_file_conditioned(&query.columns, condition, &elements)
+                            }
                             None => print_file_unconditional(&query.columns, &elements),
                         }
                         line.clear();
@@ -645,15 +636,15 @@ fn insert_unconditioned(
 
 fn insert_conditioned(
     elements: Vec<String>,
-    condition: &Vec<Vec<Condition>>,
+    condition: &[Vec<Condition>],
     columns_opt: &Option<Vec<usize>>,
     lines_buffer: &mut Vec<Vec<String>>,
     col_index: &usize,
-    asc: &bool) {
-
-    if operate_full_condition(&elements, condition){
+    asc: &bool,
+) {
+    if operate_full_condition(&elements, condition) {
         insert_unconditioned(elements, columns_opt, lines_buffer, col_index, asc);
-    } 
+    }
 }
 
 fn find_insert_position(
@@ -751,10 +742,10 @@ fn print_file_unconditional(columns_opt: &Option<Vec<usize>>, elements: &[String
 
 fn print_file_conditioned(
     columns_opt: &Option<Vec<usize>>,
-    condition: &Vec<Vec<Condition>>,
+    condition: &[Vec<Condition>],
     elements: &[String],
 ) {
-    if operate_full_condition(&elements, condition) {
+    if operate_full_condition(elements, condition) {
         print_file_unconditional(columns_opt, elements)
     }
 }
@@ -872,7 +863,7 @@ mod tests {
     }
 }
 
-/* 
+/*
 fn find_filter_column(query: &Query) -> i32 {
     let mut col_index_filter = -1;
     match &query.where_condition {

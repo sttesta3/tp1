@@ -3,7 +3,6 @@ pub mod condition_type;
 // use condition_type::BooleanOperator;
 // use crate::libs::error;
 
-
 use condition_type::ConditionOperator;
 
 pub struct Condition {
@@ -14,9 +13,9 @@ pub struct Condition {
 
 pub fn build_not_condition() -> Condition {
     Condition {
-        condition:  ConditionOperator::Equal,
-        column:     None,
-        value:      None
+        condition: ConditionOperator::Equal,
+        column: None,
+        value: None,
     }
 }
 
@@ -52,34 +51,42 @@ pub fn operate_condition(v1: &String, v2: &String, operator: &ConditionOperator)
     }
 }
 
-pub fn operate_full_condition(elements: &[String], condition: &Vec<Vec<Condition>>) -> bool {
-    // Pre:  Line to vec and condition (bool vector). 
+pub fn operate_full_condition(elements: &[String], condition: &[Vec<Condition>]) -> bool {
+    // Pre:  Line to vec and condition (bool vector).
     // Post: Bool if condition applies or not
 
-    let mut or_valid = false; 
-    let mut or_counter = 0; 
+    let mut or_valid = false;
+    let mut or_counter = 0;
 
-    let mut and_valid ;
-    let mut and_counter; 
-    let mut not_detected ;
+    let mut and_valid;
+    let mut and_counter;
+    let mut not_detected;
 
-    while or_counter < condition.len() && ! or_valid {
+    while or_counter < condition.len() && !or_valid {
         and_valid = true;
         and_counter = 0;
         not_detected = false;
         while and_counter < condition[or_counter].len() && and_valid {
             match &condition[or_counter][and_counter].column {
-                None => not_detected = ! not_detected,
+                None => not_detected = !not_detected,
                 Some(column) => match &condition[or_counter][and_counter].value {
                     None => return false,
                     Some(value) => {
                         if not_detected {
-                            and_valid = ! operate_condition(&elements[*column], value, &condition[or_counter][and_counter].condition)
+                            and_valid = !operate_condition(
+                                &elements[*column],
+                                value,
+                                &condition[or_counter][and_counter].condition,
+                            )
                         } else {
-                            and_valid = operate_condition(&elements[*column], value, &condition[or_counter][and_counter].condition);
+                            and_valid = operate_condition(
+                                &elements[*column],
+                                value,
+                                &condition[or_counter][and_counter].condition,
+                            );
                         }
                     }
-                }
+                },
             }
 
             and_counter += 1;
@@ -87,7 +94,7 @@ pub fn operate_full_condition(elements: &[String], condition: &Vec<Vec<Condition
 
         or_valid = and_valid;
 
-        or_counter += 1; 
+        or_counter += 1;
     }
 
     or_valid
