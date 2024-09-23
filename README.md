@@ -12,6 +12,8 @@ Pendientes:
 
 3. Refactor de funciones para que tengan menos de 30 lineas. Por una cuestión de tiempos se deja para el final. 
 
+6. Terminar trabajo sobre el parseo ( TODOs & funcion para imprimir errores ). Se decide para poder avanzar con las funcionalidades implementar las mismas tal que, en caso de haber un error, simplemente no ejecutarán nada.  
+
 Funcionalidades probadas OK
 
 1. SELECT 
@@ -23,6 +25,8 @@ Funcionalidades probadas OK
 4. DELETE FROM 
 
 ### Detalles de implementación
+
+Para la logica del programa se decidio dividir en dos etapas: parseo y ejecucción. El punto del parseo es que se encuentre cualquier error previo a ejecucción del query, tal que no sea posible dañar la base de datos por error humano. De encontrarse un error se debe imprimir   
 
 Logica booleana: Se implemento por medio de un vector de vectores. Por cada OR se pushea un nuevo vector, donde en este vector se pushearán las expresiones simples y las negaciones ( los ANDs no son pusheados, ya que sería redundante ).
 
