@@ -65,7 +65,7 @@ fn exec_query_delete(query: Query) {
             }
 
             if remove_old_file(table, &tmp_file_name, valid_operation).is_err() {
-                println!("Error en manipulación de archivos");
+                println!("ERROR: limpieza de archivos temporales");
             }
         }
     }
@@ -76,7 +76,6 @@ fn exec_query_insert(query: Query) {
     if let Some(table) = &query.table {
         if let Some(write_columns) = &query.columns {
             let total_columns = find_total_columns(&query);
-            //        let write_columns = find_print_columns(&query);
 
             match &mut OpenOptions::new().append(true).open(table) {
                 Ok(file) => {
@@ -100,7 +99,7 @@ fn exec_query_insert(query: Query) {
                     write_line.push('\n');
                     let _ = file.write(write_line.as_bytes());
                 }
-                Err(_) => println!("ERROR en el programa"),
+                Err(_) => println!("Error: Manipulación de archivo temporal en INSERT"),
             }
         }
     }
@@ -119,7 +118,6 @@ fn exec_query_select(query: Query) {
             }
         }
         None => {
-            //            let col_index: i32 = find_filter_column(&query);
             read_and_print_file(&query);
         }
     }
@@ -130,7 +128,9 @@ fn exec_query_select(query: Query) {
 /// Post: Cleans files 
 fn file_cleanup(files: &Vec<String>) {
     for file in files {
-        let _ = remove_file(file);
+        if let Err(_) = remove_file(file){
+            println!("ERROR: Limpieza de archivos temporales");
+        }
     }
 }
 
@@ -329,7 +329,7 @@ fn exec_query_update(query: Query) {
                     }
 
                     if remove_old_file(table, &tmp_file, valid_operation).is_err() {
-                        println!("Error en manipulación de archivos");
+                        println!("ERROR: Manipulación de archivo temporal en UPDATE");
                     }
                 }
             }
@@ -358,22 +358,23 @@ fn remove_old_file(file: &String, tmp_file: &String, valid_operation: bool) -> R
     if valid_operation {
         if remove_file(file).is_ok() {
             if rename(tmp_file, file).is_err() {
-                return Err(3);
+                return Err(error::ERROR_RENOMBRADO_ARCHIVO_TEMPORAL);
             }
             Ok(0)
         } else {
             let _ = remove_file(tmp_file);
-            Err(1)
+            Err(error::ERROR_INTERCAMBIANDO_TEMPORAL_POR_OFICIAL)
         }
     } else {
         let _ = remove_file(tmp_file);
-        Err(2)
+        Err(error::ERROR_OPERACION_INVALIDA_EN_EJECUCCION)
     }
 }
 
+/// Returns tmp filename from official file 
+/// Pre: Path and name to file. ruta/a/tablas/tabla.csv
+/// Post: same file but starting with period, as long as it's a hidden file
 fn get_tmp_file_name(table: &str) -> String {
-    // Pre: Path and name to file. ruta/a/tablas/tabla.csv
-    // Post: same file but starting with period, as long as it's a hidden file
     let mut output = String::new();
     let last_item_index = table.split('/').enumerate().count() - 1;
     for (counter, element) in table.split('/').enumerate() {
@@ -425,6 +426,7 @@ fn find_column(query: &Query, column: &String) -> Option<usize> {
     }
 }
 
+/// Print header of function. 
 fn print_header(query: &Query) {
     if let Some(table) = &query.table {
         if let Ok(file) = File::open(table) {
@@ -485,9 +487,12 @@ fn read_and_print_file(query: &Query) {
     }
 }
 
+/// Exec query line by line, sorting the output in buffer memory and printing to tmp files 
+/// PD: Similar to Cassandra Write Path :D 
+/// 
+/// Pre:  Query, the col index for sorting and bool of ascending/descending
+/// Post: Vec of tmp_files
 fn read_into_sorted_files(query: &Query, col_index: usize, asc: &bool) -> Result<Vec<String>, u32> {
-    // Pre:  Query, the col index for sorting and bool of ascending/descending
-    // Post: Vec of tmp_files
     match &query.table {
         None => Err(3),
         Some(table) => {
@@ -573,6 +578,7 @@ fn read_into_sorted_files(query: &Query, col_index: usize, asc: &bool) -> Result
     }
 }
 
+/// Write the buffer to file
 fn write_to_tmp_file(
     tmp_file_name: &String,
     tmp_filenames: &mut Vec<String>,
@@ -606,6 +612,7 @@ fn write_to_tmp_file(
     }
 }
 
+/// Insert line to buffer in sorted position (special case: no boolean condition) 
 fn insert_unconditioned(
     elements: Vec<String>,
     columns_opt: &Option<Vec<usize>>,
@@ -645,6 +652,7 @@ fn insert_unconditioned(
     }
 }
 
+/// Insert line to buffer in sorted position (special case: there's a boolean condition) 
 fn insert_conditioned(
     elements: Vec<String>,
     condition: &[Vec<Condition>],
@@ -658,6 +666,7 @@ fn insert_conditioned(
     }
 }
 
+/// Binary search of elements position. 
 fn find_insert_position(
     elements: &Vec<String>,
     lines_buffer: &Vec<Vec<String>>,
@@ -717,6 +726,7 @@ fn find_insert_position(
     }
 }
 
+/// Print line to stdout ( special case, no SORT BY condition )
 /// Pre: Columns vector sorted && Elements of line content vector
 /// Post: print to stdout the correct columns
 fn print_file_unconditional(columns_opt: &Option<Vec<usize>>, elements: &[String]) {
@@ -750,6 +760,7 @@ fn print_file_unconditional(columns_opt: &Option<Vec<usize>>, elements: &[String
     println!();
 }
 
+/// Print line to stdout with a boolean condition( special case, no SORT BY condition )
 fn print_file_conditioned(
     columns_opt: &Option<Vec<usize>>,
     condition: &[Vec<Condition>],
