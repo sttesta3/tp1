@@ -125,10 +125,10 @@ fn exec_query_select(query: Query) {
 
 /// Cleans tmp files
 /// Pre: filenames
-/// Post: Cleans files 
+/// Post: Cleans files
 fn file_cleanup(files: &Vec<String>) {
     for file in files {
-        if let Err(_) = remove_file(file){
+        if remove_file(file).is_err() {
             println!("ERROR: Limpieza de archivos temporales");
         }
     }
@@ -232,7 +232,7 @@ fn find_next_line(lines_buffer: &mut [Vec<String>], col_index: usize, asc: &bool
     }
 }
 
-/// Read first line from all files 
+/// Read first line from all files
 /// Pre: Lines buffer, col index and ascending/descending
 /// Post: Index of next line, if any
 fn readers_read_first_line(readers: &mut Vec<BufReader<File>>) -> Option<Vec<Vec<String>>> {
@@ -371,7 +371,7 @@ fn remove_old_file(file: &String, tmp_file: &String, valid_operation: bool) -> R
     }
 }
 
-/// Returns tmp filename from official file 
+/// Returns tmp filename from official file
 /// Pre: Path and name to file. ruta/a/tablas/tabla.csv
 /// Post: same file but starting with period, as long as it's a hidden file
 fn get_tmp_file_name(table: &str) -> String {
@@ -426,7 +426,7 @@ fn find_column(query: &Query, column: &String) -> Option<usize> {
     }
 }
 
-/// Print header of function. 
+/// Print header of function.
 fn print_header(query: &Query) {
     if let Some(table) = &query.table {
         if let Ok(file) = File::open(table) {
@@ -487,9 +487,9 @@ fn read_and_print_file(query: &Query) {
     }
 }
 
-/// Exec query line by line, sorting the output in buffer memory and printing to tmp files 
-/// PD: Similar to Cassandra Write Path :D 
-/// 
+/// Exec query line by line, sorting the output in buffer memory and printing to tmp files
+/// PD: Similar to Cassandra Write Path :D
+///
 /// Pre:  Query, the col index for sorting and bool of ascending/descending
 /// Post: Vec of tmp_files
 fn read_into_sorted_files(query: &Query, col_index: usize, asc: &bool) -> Result<Vec<String>, u32> {
@@ -612,7 +612,7 @@ fn write_to_tmp_file(
     }
 }
 
-/// Insert line to buffer in sorted position (special case: no boolean condition) 
+/// Insert line to buffer in sorted position (special case: no boolean condition)
 fn insert_unconditioned(
     elements: Vec<String>,
     columns_opt: &Option<Vec<usize>>,
@@ -652,7 +652,7 @@ fn insert_unconditioned(
     }
 }
 
-/// Insert line to buffer in sorted position (special case: there's a boolean condition) 
+/// Insert line to buffer in sorted position (special case: there's a boolean condition)
 fn insert_conditioned(
     elements: Vec<String>,
     condition: &[Vec<Condition>],
@@ -666,7 +666,7 @@ fn insert_conditioned(
     }
 }
 
-/// Binary search of elements position. 
+/// Binary search of elements position.
 fn find_insert_position(
     elements: &Vec<String>,
     lines_buffer: &Vec<Vec<String>>,

@@ -11,7 +11,7 @@ use crate::query::build_empty_query;
 use crate::query::query_type::QueryType;
 use crate::query::{Query, DELETE_MIN_LEN, INSERT_MIN_LEN, SELECT_MIN_LEN, UPDATE_MIN_LEN};
 
-use super::error::{DELETE_MAL_FORMATEADO, WHERE_MAL_FORMATEADO};
+use super::error::{DELETE_MAL_FORMATEADO, ORDER_BY_MAL_FORMATEADO, WHERE_MAL_FORMATEADO};
 
 /// Build query for execution
 pub fn build_query(text_query: &String, path: &String) -> Result<Query, u32> {
@@ -23,7 +23,7 @@ pub fn build_query(text_query: &String, path: &String) -> Result<Query, u32> {
 }
 
 /// Merge table and path. Aux funcion
-/// 
+///
 /// ```
 /// let result = merge_table_and_path(String::from("tablas"), "clientes.csv");
 /// assert!(result,String::from("tablas/clientes.csv"));
@@ -163,37 +163,25 @@ fn parse_args_select(args: &[String], path: &String, result: &mut Query) -> Resu
         counter += 1;
 
         if counter == args.len() {
-            Ok(0)
+            return Ok(0);
         } else if args[counter].eq("WHERE") {
             counter += 1;
             match parse_where_condition(result, args, &mut counter) {
                 Ok(cond) => result.where_condition = Some(cond),
                 Err(x) => return Err(x),
             }
+        }
 
-            if counter < args.len() {
-                if args[counter].eq("ORDER") && args[counter + 1].eq("BY") {
-                    if counter + 3 == args.len() {
-                        // ORDER BY column
-                        result.order_by = Some((args[counter + 2].to_string(), true));
-                    } else if counter + 4 == args.len() {
-                        // ORDER BY column ASC/DESC
-                        if args[counter + 3].eq("ASC") || args[counter + 3].eq("DESC") {
-                            result.order_by =
-                                Some((args[counter + 2].to_string(), args[counter + 2].eq("ASC")));
-                        } else {
-                            return Err(error::ORDER_BY_MAL_FORMATEADO);
-                        }
-                    } else {
-                        return Err(error::ORDER_BY_MAL_FORMATEADO);
-                    }
-                } else {
-                    return Err(error::ORDER_BY_MAL_FORMATEADO);
-                }
-            }
+        if counter == args.len() {
             Ok(0)
         } else {
-            Err(WHERE_MAL_FORMATEADO)
+            match parse_order_by(args, &mut counter) {
+                Ok(cond) => {
+                    result.order_by = Some(cond);
+                    Ok(0)
+                }
+                Err(x) => Err(x),
+            }
         }
     }
 }
@@ -226,11 +214,35 @@ fn get_columns_position(query: &Query, string_cols: &[String]) -> Result<Vec<usi
     }
 }
 
-/// Parse boolean where condition, advancing the counter 
+/// Parse order by
+///
+/// Pre: Counter == 3 or counter == 4
+fn parse_order_by(args: &[String], counter: &mut usize) -> Result<(String, bool), u32> {
+    if *counter + 3 == args.len() || *counter + 4 == args.len() {
+        if args[*counter].eq("ORDER") && args[*counter + 1].eq("BY") {
+            let column = args[*counter + 2].to_string();
+            let mut asc = true;
+            if *counter + 4 == args.len() {
+                if args[*counter + 3].eq("DESC") {
+                    asc = false;
+                } else if !args[*counter + 3].eq("ASC") {
+                    return Err(ORDER_BY_MAL_FORMATEADO);
+                }
+            }
+            Ok((column, asc))
+        } else {
+            Err(ORDER_BY_MAL_FORMATEADO)
+        }
+    } else {
+        Err(ORDER_BY_MAL_FORMATEADO)
+    }
+}
+
+/// Parse boolean where condition, advancing the counter
 ///
 /// Pre:  Query args and counter in next position to WHERE
 /// Post: Complex condition for query and counter at the next position of the last element of condition
-/// 
+///
 /// EXAMPLE:
 /// Pre:  parse_where_condition(query, vec!["SELECT","*","FROM","tabla","WHERE","id","<","5","ORDER","BY","id"],5);
 /// Post: Result<parsed_condition>, counter =  8
@@ -261,7 +273,7 @@ fn parse_where_condition(
     }
 }
 
-/// Pre: Query, args, position counter and wip vector 
+/// Pre: Query, args, position counter and wip vector
 /// Post: Parses the next simple condition into boolean vector
 fn parse_next_condition(
     query: &Query,
@@ -269,64 +281,65 @@ fn parse_next_condition(
     counter: &mut usize,
     vec: &mut Vec<Vec<Condition>>,
 ) -> Result<u32, u32> {
-    if !*counter + 2 < args.len() {
-        return Err(WHERE_MAL_FORMATEADO);
-    } else if args[*counter + 1].eq("AND") || args[*counter + 1].eq("OR") {
-        return Err(WHERE_MAL_FORMATEADO);
-    } else if args[*counter].eq("OR") {
-        vec.push(Vec::new());
-        *counter += 1;
-    } else if args[*counter].eq("AND") {
-        *counter += 1;
-    } else if args[*counter].eq("NOT") {
-        let position = vec.len() - 1;
-        vec[position].push(build_not_condition()); // String vacio
-        *counter += 1;
+    if *counter + 2 >= args.len() {
+        Err(WHERE_MAL_FORMATEADO)
     } else {
-        match get_columns_position(query, &[args[*counter].to_string()]) {
-            Err(x) => return Err(x),
-            Ok(x) => {
-                let simple_condition: Condition = if args[*counter + 1].eq("<") {
-                    build_condition(
-                        x[0],
-                        args[*counter + 2].to_string(),
-                        ConditionOperator::Minor,
-                    )
-                } else if args[*counter + 1].eq("<=") {
-                    build_condition(
-                        x[0],
-                        args[*counter + 2].to_string(),
-                        ConditionOperator::MinorEqual,
-                    )
-                } else if args[*counter + 1].eq("=") {
-                    build_condition(
-                        x[0],
-                        args[*counter + 2].to_string(),
-                        ConditionOperator::Equal,
-                    )
-                } else if args[*counter + 1].eq(">=") {
-                    build_condition(
-                        x[0],
-                        args[*counter + 2].to_string(),
-                        ConditionOperator::HigherEqual,
-                    )
-                } else if args[*counter + 1].eq(">") {
-                    build_condition(
-                        x[0],
-                        args[*counter + 2].to_string(),
-                        ConditionOperator::Higher,
-                    )
-                } else {
-                    return Err(WHERE_MAL_FORMATEADO);
-                };
-                let position = vec.len() - 1;
-                vec[position].push(simple_condition);
-                *counter += 3;
+        if args[*counter + 1].eq("AND") || args[*counter + 1].eq("OR") {
+            return Err(WHERE_MAL_FORMATEADO);
+        } else if args[*counter].eq("OR") {
+            vec.push(Vec::new());
+            *counter += 1;
+        } else if args[*counter].eq("AND") {
+            *counter += 1;
+        } else if args[*counter].eq("NOT") {
+            let position = vec.len() - 1;
+            vec[position].push(build_not_condition()); // String vacio
+            *counter += 1;
+        } else {
+            match get_columns_position(query, &[args[*counter].to_string()]) {
+                Err(x) => return Err(x),
+                Ok(x) => {
+                    let simple_condition: Condition = if args[*counter + 1].eq("<") {
+                        build_condition(
+                            x[0],
+                            args[*counter + 2].to_string(),
+                            ConditionOperator::Minor,
+                        )
+                    } else if args[*counter + 1].eq("<=") {
+                        build_condition(
+                            x[0],
+                            args[*counter + 2].to_string(),
+                            ConditionOperator::MinorEqual,
+                        )
+                    } else if args[*counter + 1].eq("=") {
+                        build_condition(
+                            x[0],
+                            args[*counter + 2].to_string(),
+                            ConditionOperator::Equal,
+                        )
+                    } else if args[*counter + 1].eq(">=") {
+                        build_condition(
+                            x[0],
+                            args[*counter + 2].to_string(),
+                            ConditionOperator::HigherEqual,
+                        )
+                    } else if args[*counter + 1].eq(">") {
+                        build_condition(
+                            x[0],
+                            args[*counter + 2].to_string(),
+                            ConditionOperator::Higher,
+                        )
+                    } else {
+                        return Err(WHERE_MAL_FORMATEADO);
+                    };
+                    let position = vec.len() - 1;
+                    vec[position].push(simple_condition);
+                    *counter += 3;
+                }
             }
         }
-    }
-
-    Ok(0)
+        Ok(0)    
+    } 
 }
 
 // Pre: Boolean vector (parsed boolean condition)
@@ -351,7 +364,6 @@ fn check_valid_bool(boolean_expresion: &[Vec<Condition>]) -> bool {
 
     valid
 }
-
 
 /// find column position
 fn find_column_position(column_name: &String, columns: &[String]) -> Result<usize, u32> {
