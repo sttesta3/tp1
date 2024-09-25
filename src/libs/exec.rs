@@ -107,10 +107,10 @@ fn exec_query_insert(query: Query) {
 
 /// Exec query: Special case for select
 fn exec_query_select(query: Query) {
+    print_header(&query);
     match &query.order_by {
         Some((column, asc)) => {
             if let Some(col_index) = find_column(&query, column) {
-                print_header(&query);
                 if let Ok(files) = read_into_sorted_files(&query, col_index, asc) {
                     print_sorted_files(&files, &col_index, asc);
                     file_cleanup(&files);
@@ -475,7 +475,8 @@ fn read_and_print_file(query: &Query) {
             let mut reader: BufReader<File> = BufReader::new(f);
             let mut line = String::new();
 
-            let mut read = true;
+            let mut read = reader.read_line(&mut line).is_ok();
+            line.clear();
             while read {
                 if let Ok(x) = reader.read_line(&mut line) {
                     line = line.replace('\n', "");

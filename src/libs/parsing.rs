@@ -11,7 +11,9 @@ use crate::query::build_empty_query;
 use crate::query::query_type::QueryType;
 use crate::query::{Query, DELETE_MIN_LEN, INSERT_MIN_LEN, SELECT_MIN_LEN, UPDATE_MIN_LEN};
 
-use super::error::{DELETE_MAL_FORMATEADO, ORDER_BY_MAL_FORMATEADO, WHERE_MAL_FORMATEADO};
+use super::error::{
+    DELETE_MAL_FORMATEADO, ORDER_BY_MAL_FORMATEADO, SELECT_MAL_FORMATEADO, WHERE_MAL_FORMATEADO,
+};
 
 /// Build query for execution
 pub fn build_query(text_query: &String, path: &String) -> Result<Query, u32> {
@@ -174,7 +176,7 @@ fn parse_args_select(args: &[String], path: &String, result: &mut Query) -> Resu
 
         if counter == args.len() {
             Ok(0)
-        } else {
+        } else if args[counter].eq("ORDER") {
             match parse_order_by(args, &mut counter) {
                 Ok(cond) => {
                     result.order_by = Some(cond);
@@ -182,6 +184,8 @@ fn parse_args_select(args: &[String], path: &String, result: &mut Query) -> Resu
                 }
                 Err(x) => Err(x),
             }
+        } else {
+            Err(SELECT_MAL_FORMATEADO)
         }
     }
 }
