@@ -277,6 +277,7 @@ fn create_readers(files: &[String]) -> Option<Vec<BufReader<File>>> {
     }
 }
 
+/// Exec query: Special case for update
 fn exec_query_update(query: Query) {
     if let Some(cond) = &query.where_condition {
         if let Some(columns) = &query.columns {
@@ -337,6 +338,7 @@ fn exec_query_update(query: Query) {
     }
 }
 
+/// Exec query: Special case for select
 fn update_line(elements: &[String], columns: &[usize], values: &[String]) -> String {
     let mut result = String::new();
     let mut writen_counter = 0;
@@ -354,6 +356,7 @@ fn update_line(elements: &[String], columns: &[usize], values: &[String]) -> Str
     result
 }
 
+/// Aux Function. Remove old tmp file
 fn remove_old_file(file: &String, tmp_file: &String, valid_operation: bool) -> Result<u32, u32> {
     if valid_operation {
         if remove_file(file).is_ok() {
@@ -391,6 +394,7 @@ fn get_tmp_file_name(table: &str) -> String {
     output
 }
 
+/// Aux function. Total number of columns in table
 fn find_total_columns(query: &Query) -> usize {
     match get_file_first_line(query) {
         Some(line) => line_to_vec(&line).len(),
@@ -398,6 +402,10 @@ fn find_total_columns(query: &Query) -> usize {
     }
 }
 
+/// Find column index given it's name
+///
+/// Pre: Valid query and column for text
+/// Post: Index if any
 fn find_column(query: &Query, column: &String) -> Option<usize> {
     match get_file_first_line(query) {
         Some(line) => {
@@ -460,6 +468,7 @@ fn print_header(query: &Query) {
     }
 }
 
+/// Function for printing file ( special select case when no sort by )
 fn read_and_print_file(query: &Query) {
     if let Some(table) = &query.table {
         if let Ok(f) = File::open(table) {
@@ -826,13 +835,13 @@ mod tests {
             0,
             &true,
         );
-        assert_eq!(rt1, 1);
+        assert_eq!(rt1, 2);
     }
 
     #[test]
     fn test_bsearch2() {
         let elements = vec![
-            String::from("4"),
+            String::from("1"),
             String::from("Jorge"),
             String::from("martell"),
         ];
@@ -881,7 +890,7 @@ mod tests {
             1,
             &false,
         );
-        assert_eq!(rt2, 3);
+        assert_eq!(rt2, 4);
     }
 }
 

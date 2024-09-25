@@ -338,8 +338,8 @@ fn parse_next_condition(
                 }
             }
         }
-        Ok(0)    
-    } 
+        Ok(0)
+    }
 }
 
 // Pre: Boolean vector (parsed boolean condition)
@@ -502,16 +502,7 @@ fn validate_query(query: Query) -> Result<Query, u32> {
 /// Validate query: Special case for delete
 fn validate_delete_query(query: Query) -> Result<Query, u32> {
     if query.columns.is_none() && query.values.is_none() && query.where_condition.is_some() {
-        match &query.table {
-            Some(table) => match File::open(table) {
-                Ok(file) => match get_columns(file) {
-                    Some(_) => Ok(query),
-                    None => Err(error::ARCHIVO_VACIO),
-                },
-                Err(_) => Err(error::ARCHIVO_NO_PUDO_SER_ABIERTO),
-            },
-            None => Err(error::ARCHIVO_NO_PUDO_SER_ABIERTO),
-        }
+        validate_table(query)
     } else {
         Err(error::DELETE_MAL_FORMATEADO)
     }
@@ -519,20 +510,43 @@ fn validate_delete_query(query: Query) -> Result<Query, u32> {
 
 /// Validate query: Special case for insert
 fn validate_insert_query(query: Query) -> Result<Query, u32> {
-    // TODO
-    Ok(query)
+    if query.values.is_some() && query.columns.is_some() && query.where_condition.is_none() {
+        validate_table(query)
+    } else {
+        Err(error::INSERT_MAL_FORMATEADO)
+    }
 }
 
 /// Validate query: Special case for select
 fn validate_select_query(query: Query) -> Result<Query, u32> {
-    // TODO
-    Ok(query)
+    if query.values.is_none() {
+        validate_table(query)
+    } else {
+        Err(error::SELECT_MAL_FORMATEADO)
+    }
 }
 
 /// Validate query: Special case for update
 fn validate_update_query(query: Query) -> Result<Query, u32> {
-    // TODO
-    Ok(query)
+    if query.values.is_some() && query.columns.is_some() && query.where_condition.is_some() {
+        validate_table(query)
+    } else {
+        Err(error::UPDATE_MAL_FORMATEADO)
+    }
+}
+
+/// Validate if table is valid
+fn validate_table(query: Query) -> Result<Query, u32> {
+    match &query.table {
+        Some(table) => match File::open(table) {
+            Ok(file) => match get_columns(file) {
+                Some(_) => Ok(query),
+                None => Err(error::ARCHIVO_VACIO),
+            },
+            Err(_) => Err(error::ARCHIVO_NO_PUDO_SER_ABIERTO),
+        },
+        None => Err(error::FALTA_ARCHIVO),
+    }
 }
 
 /// AUX: Get columns from file
