@@ -5,6 +5,7 @@ pub mod condition_type;
 
 use condition_type::ConditionOperator;
 
+#[derive(Debug)]
 pub struct Condition {
     pub condition: ConditionOperator,
     pub column: Option<usize>,
@@ -59,48 +60,48 @@ pub fn operate_condition(v1: &String, v2: &String, operator: &ConditionOperator)
 ///
 /// Pre:  Line to vec and condition (bool vector).
 /// Post: Bool if condition applies or not
+/// 
+/// It iterates over elements in bool vec. If AND condition it's true, stops checking
 pub fn operate_full_condition(elements: &[String], condition: &[Vec<Condition>]) -> bool {
     let mut or_valid = false;
     let mut or_counter = 0;
 
-    let mut and_valid;
-    let mut and_counter;
-    let mut not_detected;
-
     while or_counter < condition.len() && !or_valid {
-        and_valid = true;
-        and_counter = 0;
-        not_detected = false;
-        while and_counter < condition[or_counter].len() && and_valid {
-            match &condition[or_counter][and_counter].column {
-                None => not_detected = !not_detected,
-                Some(column) => match &condition[or_counter][and_counter].value {
-                    None => return false,
-                    Some(value) => {
-                        if not_detected {
-                            and_valid = !operate_condition(
-                                &elements[*column],
-                                value,
-                                &condition[or_counter][and_counter].condition,
-                            )
-                        } else {
-                            and_valid = operate_condition(
-                                &elements[*column],
-                                value,
-                                &condition[or_counter][and_counter].condition,
-                            );
-                        }
-                    }
-                },
-            }
-
-            and_counter += 1;
-        }
-
-        or_valid = and_valid;
-
+        or_valid = operate_and(elements,condition,&or_counter);
         or_counter += 1;
     }
 
     or_valid
+}
+
+/// Aux function of operate_full_condition
+/// Checks if any condition is false. 
+fn operate_and(elements: &[String], condition: &[Vec<Condition>], or_counter: &usize) -> bool {
+    let mut and_valid = true;
+    let mut and_counter = 0;
+    let mut not_detected: bool = false;
+    while and_counter < condition[*or_counter].len() && and_valid {
+        match &condition[*or_counter][and_counter].column {
+            None => not_detected = !not_detected,
+            Some(column) => match &condition[*or_counter][and_counter].value {
+                None => return false,
+                Some(value) => {
+                    and_valid = operate_condition(
+                        &elements[*column],
+                        value,
+                        &condition[*or_counter][and_counter].condition,
+                    );
+            
+                    if not_detected {
+                        and_valid = !and_valid;
+                        not_detected = false;
+                    }
+                }
+            },
+        }
+
+        and_counter += 1;
+    }
+
+    and_valid
 }

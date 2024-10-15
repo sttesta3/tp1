@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub enum ConditionOperator {
     Minor,
     MinorEqual,
@@ -6,6 +7,7 @@ pub enum ConditionOperator {
     HigherEqual,
 }
 
+#[derive(Debug)]
 pub enum BooleanOperator {
     AND,
     OR,
