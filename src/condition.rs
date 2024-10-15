@@ -60,14 +60,14 @@ pub fn operate_condition(v1: &String, v2: &String, operator: &ConditionOperator)
 ///
 /// Pre:  Line to vec and condition (bool vector).
 /// Post: Bool if condition applies or not
-/// 
+///
 /// It iterates over elements in bool vec. If AND condition it's true, stops checking
 pub fn operate_full_condition(elements: &[String], condition: &[Vec<Condition>]) -> bool {
     let mut or_valid = false;
     let mut or_counter = 0;
 
     while or_counter < condition.len() && !or_valid {
-        or_valid = operate_and(elements,condition,&or_counter);
+        or_valid = operate_and(elements, condition, &or_counter);
         or_counter += 1;
     }
 
@@ -75,7 +75,7 @@ pub fn operate_full_condition(elements: &[String], condition: &[Vec<Condition>])
 }
 
 /// Aux function of operate_full_condition
-/// Checks if any condition is false. 
+/// Checks if any condition is false.
 fn operate_and(elements: &[String], condition: &[Vec<Condition>], or_counter: &usize) -> bool {
     let mut and_valid = true;
     let mut and_counter = 0;
@@ -91,7 +91,7 @@ fn operate_and(elements: &[String], condition: &[Vec<Condition>], or_counter: &u
                         value,
                         &condition[*or_counter][and_counter].condition,
                     );
-            
+
                     if not_detected {
                         and_valid = !and_valid;
                         not_detected = false;
