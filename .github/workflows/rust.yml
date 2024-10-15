@@ -2,7 +2,7 @@ name: Rust
 
 on:
   push:
-    branches: [ "main","desarrollo_post_e1" ]
+    branches: [ "main","desarrollo_post_e1","desarrollo_e2" ]
   pull_request:
     branches: [ "main" ]
 
