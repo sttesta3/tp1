@@ -78,6 +78,7 @@ fn parse_args_insert(args: &[String], path: &String, result: &mut Query) -> Resu
         let mut string_columns: Vec<String> = Vec::new();
         let mut counter = 3;
         while counter < args.len() && !args[counter].eq("VALUES") {
+            
             string_columns.push(args[counter].to_string());
             counter += 1;
         }
@@ -604,6 +605,9 @@ pub fn get_file_first_line(query: &Query) -> Option<String> {
 pub fn text_to_vec(text_query: &String, coma: bool) -> Vec<String> {
     let mut tmp_text_query = text_query.to_string();
     tmp_text_query = tmp_text_query.replace('\n', " ");
+    tmp_text_query = tmp_text_query.replace('\'', "");
+    tmp_text_query = tmp_text_query.replace('(', "");
+    tmp_text_query = tmp_text_query.replace(')', "");
     if !coma {
         tmp_text_query = tmp_text_query.replace(',', "");
     } else {
