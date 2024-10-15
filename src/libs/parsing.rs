@@ -78,7 +78,6 @@ fn parse_args_insert(args: &[String], path: &String, result: &mut Query) -> Resu
         let mut string_columns: Vec<String> = Vec::new();
         let mut counter = 3;
         while counter < args.len() && !args[counter].eq("VALUES") {
-            
             string_columns.push(args[counter].to_string());
             counter += 1;
         }
