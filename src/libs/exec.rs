@@ -412,21 +412,39 @@ fn find_column(query: &Query, column: &String) -> Option<usize> {
         Some(line) => {
             let args = parsing::text_to_vec(&line, true);
             let mut counter = 0;
-            while counter < args.len() && !args[counter].eq(column) {
-                counter += 1
-            }
-
-            if counter == args.len() {
-                None
-            } else {
-                match &query.columns {
-                    None => Some(counter),
-                    Some(cols) => {
-                        if cols.contains(&counter) {
-                            Some(counter)
-                        } else {
-                            None
+            match &query.columns {
+                None => {
+                    while counter < args.len() && !args[counter].eq(column) {
+                        counter += 1
+                    }
+        
+                    if counter == args.len() {
+                        None
+                    } else {
+                        Some(counter)
+/* 
+                        match &query.columns {
+                            None => Some(counter),
+                            Some(cols) => {
+                                if cols.contains(&counter) {
+                                    Some(counter)
+                                } else {
+                                    None
+                                }
+                            }
                         }
+*/
+                    }        
+                },
+                Some(cols) => {
+                    while counter < cols.len() && !args[cols[counter]].eq(column) {
+                        counter += 1;
+                    }
+
+                    if counter == cols.len() {
+                        None
+                    } else {
+                        Some(counter)
                     }
                 }
             }
@@ -460,7 +478,7 @@ fn print_header(query: &Query) {
                                 }
                             }
                             println!();
-                        }
+                        },
                         None => print!("{}", line),
                     }
                 }
