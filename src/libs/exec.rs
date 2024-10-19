@@ -417,25 +417,25 @@ fn find_column(query: &Query, column: &String) -> Option<usize> {
                     while counter < args.len() && !args[counter].eq(column) {
                         counter += 1
                     }
-        
+
                     if counter == args.len() {
                         None
                     } else {
                         Some(counter)
-/* 
-                        match &query.columns {
-                            None => Some(counter),
-                            Some(cols) => {
-                                if cols.contains(&counter) {
-                                    Some(counter)
-                                } else {
-                                    None
-                                }
-                            }
-                        }
-*/
-                    }        
-                },
+                        /*
+                                                match &query.columns {
+                                                    None => Some(counter),
+                                                    Some(cols) => {
+                                                        if cols.contains(&counter) {
+                                                            Some(counter)
+                                                        } else {
+                                                            None
+                                                        }
+                                                    }
+                                                }
+                        */
+                    }
+                }
                 Some(cols) => {
                     while counter < cols.len() && !args[cols[counter]].eq(column) {
                         counter += 1;
@@ -478,7 +478,7 @@ fn print_header(query: &Query) {
                                 }
                             }
                             println!();
-                        },
+                        }
                         None => print!("{}", line),
                     }
                 }
@@ -651,17 +651,20 @@ fn insert_unconditioned(
 ) {
     let position: usize = if lines_buffer.is_empty() {
         0
+    } else if let Some(cols) = columns_opt {
+        let mut result = Vec::new();
+        for col in cols {
+            result.push(elements[*col].to_string());
+        }
+        find_insert_position(
+            &result,
+            lines_buffer,
+            0,
+            lines_buffer.len() - 1,
+            *col_index,
+            asc,
+        )
     } else {
-        let elements = match columns_opt {
-            None => elements.clone(),
-            Some(cols) => {
-                let mut result = Vec::new();
-                for col in cols {
-                    result.push(elements[*col].to_string());
-                }
-                result
-            }
-        };
         find_insert_position(
             &elements,
             lines_buffer,
