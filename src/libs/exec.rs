@@ -652,6 +652,16 @@ fn insert_unconditioned(
     let position: usize = if lines_buffer.is_empty() {
         0
     } else {
+        let elements = match columns_opt {
+            None => elements.clone(),
+            Some(cols) => {
+                let mut result = Vec::new();
+                for col in cols {
+                    result.push(elements[*col].to_string());
+                }
+                result
+            }
+        };
         find_insert_position(
             &elements,
             lines_buffer,
