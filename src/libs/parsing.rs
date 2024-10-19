@@ -109,15 +109,22 @@ fn parse_args_update(args: &[String], path: &String, result: &mut Query) -> Resu
             Err(_) => return Err(error::ARCHIVO_NO_PUDO_SER_ABIERTO),
         }
 
-        let mut counter: usize = 3;
+        let mut counter: usize = 2;
+        if ! args[counter].eq("SET") {
+            return Err(error::UPDATE_MAL_FORMATEADO)
+        }
+
+        counter += 1;
         let mut string_columns: Vec<String> = Vec::new();
         let mut values: Vec<String> = Vec::new();
 
         while counter < args.len() && !args[counter].eq("WHERE") {
-            if counter % 3 == 0 {
+            if counter % 3 == 0 {   
                 string_columns.push(args[counter].to_string());
-            } else if (counter % 3) == 2 {
+            } else if counter % 3 == 2 {
                 values.push(args[counter].to_string());
+            } else if ! args[counter].eq("=") { 
+                return Err(error::UPDATE_MAL_FORMATEADO)
             }
             counter += 1;
         }
@@ -128,6 +135,7 @@ fn parse_args_update(args: &[String], path: &String, result: &mut Query) -> Resu
         }
         result.values = Some(values);
 
+        counter += 1;
         match parse_where_condition(result, args, &mut counter) {
             Ok(cond) => result.where_condition = Some(cond),
             Err(x) => return Err(x),
