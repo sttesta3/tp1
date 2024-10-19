@@ -110,8 +110,8 @@ fn parse_args_update(args: &[String], path: &String, result: &mut Query) -> Resu
         }
 
         let mut counter: usize = 2;
-        if ! args[counter].eq("SET") {
-            return Err(error::UPDATE_MAL_FORMATEADO)
+        if !args[counter].eq("SET") {
+            return Err(error::UPDATE_MAL_FORMATEADO);
         }
 
         counter += 1;
@@ -119,12 +119,12 @@ fn parse_args_update(args: &[String], path: &String, result: &mut Query) -> Resu
         let mut values: Vec<String> = Vec::new();
 
         while counter < args.len() && !args[counter].eq("WHERE") {
-            if counter % 3 == 0 {   
+            if counter % 3 == 0 {
                 string_columns.push(args[counter].to_string());
             } else if counter % 3 == 2 {
                 values.push(args[counter].to_string());
-            } else if ! args[counter].eq("=") { 
-                return Err(error::UPDATE_MAL_FORMATEADO)
+            } else if !args[counter].eq("=") {
+                return Err(error::UPDATE_MAL_FORMATEADO);
             }
             counter += 1;
         }

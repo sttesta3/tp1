@@ -353,6 +353,7 @@ fn update_line(elements: &[String], columns: &[usize], values: &[String]) -> Str
             result.push_str(&element.to_string());
         }
     }
+    result.push('\n');
     result
 }
 
